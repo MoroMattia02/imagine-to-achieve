@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(python -m pytest *)",
+      "Bash(ls *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(pip install *)",
+      "Edit(./third_party/**)"
+    ],
+    "deny": [
+      "Bash(sbatch *)",
+      "Bash(scancel *)",
+      "Bash(rm *)",
+      "Read(./.env)",
+      "Read(~/.ssh/**)"
+    ]
+  }
+}
