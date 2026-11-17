@@ -62,6 +62,52 @@ def geodesic_angle(R_a: np.ndarray, R_b: np.ndarray) -> np.ndarray:
     return np.arctan2(sin, cos)
 
 
+def so3_log(R: np.ndarray) -> np.ndarray:
+    """Log map: rotation matrices ``(..., 3, 3)`` to axis-angle ``(..., 3)`` with norm in [0, pi].
+
+    Inverse of :func:`rotvec_to_matrix`. Away from 0 and pi the axis comes from
+    ``vee(R - R^T) / (2 sin t)``. Near 0 a series is used. Near pi, ``R - R^T`` vanishes, so the
+    axis is taken from the largest column of ``(R + I) / 2`` (= ``n n^T`` at t = pi), with its
+    sign fixed by ``vee(R - R^T)``. Only the symmetric part is used there:
+    ``(R + R^T) / 2 = cos t I + (1 - cos t) n n^T`` holds exactly, with no skew contamination.
+    """
+    R = np.asarray(R, dtype=np.float64)
+    vee = np.stack(
+        [R[..., 2, 1] - R[..., 1, 2], R[..., 0, 2] - R[..., 2, 0], R[..., 1, 0] - R[..., 0, 1]],
+        axis=-1,
+    )
+    sin = 0.5 * np.linalg.norm(vee, axis=-1)
+    cos = 0.5 * (np.trace(R, axis1=-2, axis2=-1) - 1.0)
+    theta = np.arctan2(sin, cos)
+
+    # Regular and small-angle branch: r = vee * theta / (2 sin theta).
+    small = theta < _SMALL_ANGLE
+    safe_sin = np.where(small, 1.0, sin)
+    t2 = theta * theta
+    scale = np.where(small, 0.5 * (1.0 + t2 / 6.0 + 7.0 * t2 * t2 / 360.0), 0.5 * theta / safe_sin)
+    out = vee * scale[..., None]
+
+    # Near-pi branch.
+    near_pi = theta > np.pi - 1e-3
+    if np.any(near_pi):
+        Rn = R[near_pi]
+        c = cos[near_pi][..., None, None]
+        S = (0.5 * (Rn + np.swapaxes(Rn, -1, -2)) - c * np.eye(3)) / (1.0 - c)  # = n n^T
+        idx = np.argmax(np.diagonal(S, axis1=-2, axis2=-1), axis=-1)
+        n = np.take_along_axis(S, idx[:, None, None].repeat(3, axis=1), axis=-1)[..., 0]
+        n /= np.linalg.norm(n, axis=-1, keepdims=True)
+        sign = np.where(np.sum(n * vee[near_pi], axis=-1) < 0.0, -1.0, 1.0)
+        out[near_pi] = n * (sign * theta[near_pi])[..., None]
+    return out
+
+
+def invert_T(T: np.ndarray) -> np.ndarray:
+    """Inverse of homogeneous transforms ``(..., 4, 4)``: ``[R^T, -R^T p; 0 1]``."""
+    T = np.asarray(T, dtype=np.float64)
+    R_t = np.swapaxes(T[..., :3, :3], -1, -2)
+    return make_T(R_t, -np.einsum("...ij,...j->...i", R_t, T[..., :3, 3]))
+
+
 def make_T(R: np.ndarray, p: np.ndarray) -> np.ndarray:
     """Homogeneous transform ``[R p; 0 1]`` from ``(..., 3, 3)`` and ``(..., 3)``."""
     R = np.asarray(R, dtype=np.float64)
