@@ -2,12 +2,11 @@
 
 Blocked on lab request 2 (intrinsics, extrinsics, wrist mount). Guide section 5.
 
-Open point on view naming (check before T4). The plan says main = d435_rgb, wrist = d405_0_rgb,
-extra = d405_1_rgb. The production config comment says instead "Canonical Ctrl-World names:
-main=D405_0 (view 0), wrist=D435 (view 2), extra=D405_1 (view 1)", the reset images are loaded in
-the order [d405_0, d405_1, d435], and the terminal-goal reward remaps logical wrist=D435 to the
-reward's "main". So "main" means different cameras in different places. The twin keys views by the
-physical camera name below and never by "main" / "wrist" / "extra".
+View naming (resolved by reading, 17 Nov): main = d405_0_rgb, wrist = d435_rgb, side/extra =
+d405_1_rgb (cosmos_framework camera_layout.py CLOSE_DESKTOP_* layouts, consistent with the
+production config comment). The plan's "main = d435_rgb" is wrong. The terminal-goal reward
+remaps these names again, so the twin keys views by the physical camera name below and never by
+"main" / "wrist" / "extra".
 """
 
 from __future__ import annotations
