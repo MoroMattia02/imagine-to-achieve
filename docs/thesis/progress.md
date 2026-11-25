@@ -1,8 +1,21 @@
 # Twin progress log
 
-Last updated: 17 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_implementation_plan.md`.
+Last updated: 25 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_implementation_plan.md`; work packages (WP) to `docs/thesis/data_free_roadmap.md`.
 
 ## Done
+
+**WP 1.1: housekeeping, T0 render, viewer script. Done on Linux (25 Nov); the Windows items are (check).**
+
+| Item | Where | Result |
+|---|---|---|
+| 1-ulp MJCF mismatch fixed: `Rx(0)`, `Rx(+-pi/2)` written exactly as `(1,0,0,0)`, `(sqrt(0.5), +-sqrt(0.5), 0, 0)` | `_rx_quat` in `src/twin/robot.py` | regenerated `ur5.xml` is **byte-identical** to the committed (Windows) file, so both asset tests now pass on Linux |
+| T0: off-screen render from a named MJCF camera, 192x320 | `TwinRenderer.render` / `close` / context manager in `src/twin/render.py` | shape, uint8, not one colour, arm in view (3.9 % of pixels), identical for two renders, changes with `q`, unknown camera = `KeyError` |
+| Render time (EGL, RTX 4070, i7-14700) | `MUJOCO_GL=egl python tests/test_twin_render.py` | **0.09-0.10 ms/frame** (3 runs, 100 frames, after one warm-up; `update_scene` + render + read-back). Lower bound: 7 untextured geoms (base + 6 capsules), one view |
+| EGL default for pytest on Linux | `tests/conftest.py` | `MUJOCO_GL=egl` unless already set; Windows/macOS untouched |
+| Viewer | `scripts/twin_view.py` (`--model ur5`, `--replay q.json/.npz`, `--demo-chunk [--chunks N]`, `--loop`) | headless parts tested; the window itself is (check) on the Windows laptop |
+| Tests | `test_twin_render.py` (4), `test_twin_view_script.py` (9), `test_twin_mujoco_fk.py` (+3) | twin subset: **69 passed** (Linux, 25 Nov), was 51 passed + 2 failed |
+
+Sensitivity check (each break reverted afterwards): a libm `sin/cos` for the -pi/2 twist (5 asset tests fail), swapped height/width (shape test), a reused output buffer (identity and state tests), a scene built only once (state test), no camera-name check (unknown-camera test), no finite check on replay files, a demo chunk that does not close (closed-loop test), `fps` of `.npz` files ignored (option wiring test). Not caught, by design: a top-level `import mujoco.viewer` (importing it needs no display, so `--help` still works headless). With `conftest.py` disabled and neither `DISPLAY` nor `MUJOCO_GL` set, the render tests skip with "no OpenGL context" (listed by `-ra`), they do not fail.
 
 **T1: UR5 kinematics. Done, all acceptance criteria met.**
 
@@ -64,9 +77,16 @@ Acceptance (1 mm / 0.1 deg): met by a wide margin; the solver tolerance is 1e-6.
 
 - **Camera naming resolved by reading (17 Nov): main = `d405_0_rgb`, wrist = `d435_rgb`, side/extra = `d405_1_rgb`.** Source: `CLOSE_DESKTOP_DROID_LAYOUT` / `CLOSE_DESKTOP_VERTICAL_LAYOUT` in `third_party/cosmos_framework/data/vfm/action/camera_layout.py:136`, consistent with the production config comment (main = D405_0, wrist = D435, extra = D405_1). The plan (`twin_implementation_plan.md`, item 9) and guide (section 1) say main = `d435_rgb`; that is wrong and should be corrected there. The terminal-goal reward remaps names again (`ctrl_world_source_mapping`), so the twin still keys views by physical camera name.
 
+- **WP 1.1: exact `sqrt(0.5)` for the quarter-turn twists, not a tolerance in the test.** The intended rotation is exactly pi/2. glibc's `sin(float(pi)/4)` is correctly rounded (`...475`); the Windows libm returned `...476`, which happens to equal `sqrt(0.5)`. IEEE `sqrt` is correctly rounded everywhere, so the generator output is now the same on every platform. A test fakes a libm that is off by 1 ulp in either direction and checks that the MJCF is unchanged, so the property is tested on any single machine.
+- **WP 1.1: the render tests add their camera with `MjSpec`**, so the committed `ur5.xml` (pure kinematics) stays unchanged. The real cameras come with T4 (WP 3.1).
+- **WP 1.1: `TwinRenderer.render` does not call `mj_forward`.** The caller keeps `data` up to date, and rendering never changes the simulation state. It returns a new array each call.
+- **WP 1.1: `tests/conftest.py` sets `MUJOCO_GL=egl` on every Linux run, not only when `DISPLAY` is unset.** This machine has `DISPLAY=:1` even over SSH, so a "headless only" rule would not have triggered here. An explicit `MUJOCO_GL` still wins.
+- **WP 1.1: the render tests skip, rather than fail, when no OpenGL context can be created.** The check is a bare `mujoco.Renderer`, separate from `TwinRenderer`, so a bug in the twin code still fails. The skip reason is printed by `-ra`; on this machine the tests run (no skip).
+- **WP 1.1: the timing is a `__main__` block in the test file**, so the recorded number comes from the same scene as the tests, without a separate script.
+
 ## In progress
 
-Nothing half-done. T1 and T2 (synthetic) are closed. T0 (headless render) has not started; a one-off EGL render of 192x320 worked on this Linux machine (RTX 4070), not yet a test.
+Nothing half-done. WP 1.1 is closed on Linux; its Windows checks are listed under open problems.
 
 ## Open problems
 
@@ -76,7 +96,12 @@ Nothing half-done. T1 and T2 (synthetic) are closed. T0 (headless render) has no
   - Which dataset root the policy was trained on is not recorded in the repo, and the dataset is not on this machine.
   - If it holds joints, production seeds Ctrl-World with joint angles as an EEF pose (the saturation bug described in the 2214 comment). It also decides how the twin gets `q0` and `T_WB`: from joints, `T_WB` follows from FK; from EEF only, `q0` comes from `initial_configuration`.
   - One-minute check where the data lives: `python -c "import json;f=json.load(open('<dataset>/meta/info.json'))['features'];print(f['observation.state'],f['action'])"` (LeRobot usually stores per-channel `names`). Without names: joints look like `-1.57, -1.9, ...`; an EEF pose has xyz within about +-1 m and a 3-value rotvec of norm <= pi.
-- **MJCF asset tests fail on Linux.** `ur5.xml` was generated on Windows; `math.sin(pi/4)` differs in the last digit between the Windows and Linux libm, so `test_committed_asset_is_generator_output` and `test_asset_file_loads_to_same_kinematics` fail here (kinematics unaffected, 1 ulp). Fix proposal, not applied: write exact `sqrt(0.5)` for alpha = +-pi/2 in the generator, or compare with a tolerance.
+- **WP 1.1 on Windows (check).** Run `python -m pytest tests/test_twin_*.py -q` (expect 69 passed; the asset tests should pass since the file is unchanged) and the viewer by hand: `python scripts/twin_view.py`, `--demo-chunk`, `--replay <file>`. MuJoCo's own viewer also works: `python -m mujoco.viewer --mjcf=src/twin/assets/ur5.xml` (flag read from `--help` in 4.0.1; the window was not opened here).
+- **Roadmap references checked on 25 Nov (Phase 1 Step 0), not fixed:**
+  - the proposal PDF (`thesis_proposal_final.pdf`) is not in the repo, so equation, lemma, proposition and assumption numbers in docstrings are taken from the roadmap (check);
+  - `grpo_action_suffix_advantages` takes `(rewards, loss_mask, dones, *, group_size, gamma)`, with contiguous groups, ε = 1e-6 hard-coded, and a float32 cast before the mask. The cross-rank `validate_and_compute_group_suffix_advantages` (`cross_rank_grpo.py:801`) keeps the input dtype and gathers groups with `index_select`; whether the two agree bit for bit is (check, WP 1.2);
+  - a third suffix-advantage function, `compute_grpo_action_suffix_advantages` (`third_party/rlinf_runtime/rlinf/algorithms/advantages.py:139`, success anchoring and dynamic gammas), is not mentioned in the roadmap; which one production uses for the close config matters for WP 5.1 (check).
+- **Pre-existing ruff findings in `src/twin/robot.py`** (two lines over 100 characters, `zip` without `strict=`) and a missing blank line after two module docstrings; present at `f4f669e`, not touched in WP 1.1.
 - **Gripper clip range** = q01/q99 of the policy action statistics (`action_stats_path`, not in the repo). Needed for exact parity on the gripper channel.
 
 - **Lab requests (critical path), not sent yet.** These are:
@@ -93,12 +118,6 @@ Nothing half-done. T1 and T2 (synthetic) are closed. T0 (headless render) has no
 
 ## Exact next step
 
-**T0: headless render** (unchanged, see below). Then the **T2 demo check** as soon as the dataset is available: convert the recorded actions of the 8 held-out episodes with `actions_to_eef_targets`, run `ActionsToJoints`, compare with the recorded `observation.state` of the following frames, and report the error distribution. Settle the `observation.state` question first.
+**WP 1.2: trust-weighted advantages** (`data_free_roadmap.md` §2, Step 8, T8, D1). Tests first in `tests/test_trust_weighting.py` (the seven acceptance items), then `src/rlinf_modified/algorithms/trust.py` and the optional `weights=None, std_source="weighted"` arguments of `grpo_action_suffix_advantages` (the old path bit-identical, tested). No edit to `cross_rank_grpo.py`. Also `docs/thesis/notes/d1_scale_policy.md`. Run `tests/test_algorithms_contracts_rewards.py` as well.
 
-T0 steps:
-
-1. Write `tests/test_twin_render.py` first: load `load_ur5_model()`, add a fixed camera, render one 192x320 RGB frame off-screen with `mujoco.Renderer`, and assert the shape is (192, 320, 3) and the frame is not all one colour.
-2. Time 100 frames and record ms/frame here (needed for the compute budget in the plan).
-3. Use `MUJOCO_GL=egl` on Linux with a GPU (this machine), the default GL backend on Windows.
-
-After T0 and the T2 demo check: T8, then T3 when the lab data arrives.
+Still pending once the dataset is available: the **T2 demo check** (convert the recorded actions of the 8 held-out episodes with `actions_to_eef_targets`, run `ActionsToJoints`, compare with the recorded `observation.state` of the following frames, report the error distribution). Settle the `observation.state` question first.

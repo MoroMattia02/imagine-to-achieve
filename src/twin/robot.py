@@ -103,6 +103,25 @@ def _vec(*xs: float) -> str:
     return " ".join(_num(x) for x in xs)
 
 
+_SQRT_HALF = math.sqrt(0.5)  # IEEE sqrt is correctly rounded: the same bits on every platform
+
+
+def _rx_quat(alpha: float) -> tuple[float, float, float, float]:
+    """Quaternion ``(w, x, y, z)`` of ``Rx(alpha)``.
+
+    Exact for the UR5 twists 0 and +-pi/2, so the generated MJCF does not depend on the
+    platform's libm (``math.sin(pi/4)`` differs by 1 ulp between the Windows and Linux libm).
+    Any other angle falls back to cos/sin.
+    """
+    if alpha == 0.0:
+        return (1.0, 0.0, 0.0, 0.0)
+    if alpha == math.pi / 2:
+        return (_SQRT_HALF, _SQRT_HALF, 0.0, 0.0)
+    if alpha == -math.pi / 2:
+        return (_SQRT_HALF, -_SQRT_HALF, 0.0, 0.0)
+    return (math.cos(alpha / 2), math.sin(alpha / 2), 0.0, 0.0)
+
+
 def ur5_mjcf_xml() -> str:
     """MJCF of the UR5 arm, generated from ``UR5_DH`` and ``TCP_OFFSET`` (no mujoco import).
 
@@ -127,7 +146,7 @@ def ur5_mjcf_xml() -> str:
     parent_F = (0.0, 0.0, 0.0)  # (a, d, alpha) of the previous link; identity for body 1
     for i, ((a, d, alpha), joint, link) in enumerate(zip(UR5_DH, JOINT_NAMES, LINK_NAMES)):
         pa, pd, palpha = parent_F
-        quat = _vec(math.cos(palpha / 2), math.sin(palpha / 2), 0.0, 0.0)
+        quat = _vec(*_rx_quat(palpha))
         lines.append(f'{indent}<body name="{link}" pos="{_vec(pa, 0.0, pd)}" quat="{quat}">')
         inner = indent + "  "
         lines.append(

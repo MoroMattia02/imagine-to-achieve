@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -102,6 +103,27 @@ def test_mujoco_zero_configuration(model):
 def test_committed_asset_is_generator_output():
     # src/twin/assets/ur5.xml is written by scripts/make_twin_ur5_mjcf.py; never hand-edit it.
     assert UR5_ASSET_PATH.read_text(encoding="utf-8") == ur5_mjcf_xml()
+
+
+@pytest.mark.parametrize("direction", [2.0, -2.0])
+def test_generator_output_does_not_depend_on_libm(monkeypatch, direction):
+    # WP 1.1: libm sin/cos may differ by 1 ulp between platforms (sin(pi/4) does between the
+    # Windows and Linux libm). Simulate such a libm; the generated MJCF must not change.
+    reference = ur5_mjcf_xml()
+
+    def off_by_one_ulp(f):
+        return lambda x: float(np.nextafter(f(x), direction)) if x else f(x)
+
+    monkeypatch.setattr(math, "sin", off_by_one_ulp(math.sin))
+    monkeypatch.setattr(math, "cos", off_by_one_ulp(math.cos))
+    assert ur5_mjcf_xml() == reference
+
+
+def test_generator_writes_exact_quarter_turn_quaternions():
+    # Rx(0) and Rx(+-pi/2) exactly: (1, 0, 0, 0) and (sqrt(0.5), +-sqrt(0.5), 0, 0).
+    s = "0.7071067811865476"  # repr(math.sqrt(0.5)); sqrt is correctly rounded on every platform
+    quats = set(re.findall(r'quat="([^"]+)"', ur5_mjcf_xml()))
+    assert quats == {"1.0 0.0 0.0 0.0", f"{s} {s} 0.0 0.0", f"{s} -{s} 0.0 0.0"}
 
 
 def test_asset_file_loads_to_same_kinematics(model):

@@ -7,6 +7,7 @@ post-training. Short thesis summary: `docs/thesis/thesis_context.md`. Code map a
 milestones T0 to T8: `docs/thesis/twin_implementation_plan.md`. Theory, reasons and
 tests per component: `docs/thesis/twin_detailed_guide.md`. Read the relevant section
 before starting a milestone. Work on one milestone at a time.
+Data-free roadmap and the current WP: `docs/thesis/data_free_roadmap.md`.
 
 ## Layout
 - `third_party/rlinf_runtime/` vendored RLinf runtime (production training loop).
