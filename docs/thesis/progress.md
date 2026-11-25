@@ -4,6 +4,15 @@ Last updated: 25 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_
 
 ## Done
 
+**WP 1.3: change features and the distance D-tilde (Step 4, eqs. (11)-(12), P4; Step 7.2, eq. (16)). Done (25 Nov).**
+
+| Item | Where | Result |
+|---|---|---|
+| `change_features` (eq. (11), unit norm checked per view), `average_views` (keyed by physical camera name, fixed summation order), `d_tilde` (eq. (12)), `grounded_scores` (S = min over twin samples of eq. (16), kappa = max pairwise D-tilde) | `src/twin/compare.py` (numpy, no encoder) | pseudometric (300 random triples + a collinear triple where the triangle inequality is tight), D-tilde <= 4 and 4 attained, P4 (c) on unit features under a constant offset, S = min_theta d(theta), kappa = max pair and 0 for coincident samples, windows outside the chunk ignored, view averaging commutes with eq. (11) |
+| Tests | `tests/test_twin_compare.py` (17) | **17 passed** in 0.16 s; twin subset **86 passed** (25 Nov) |
+
+Sensitivity check (each break reverted; 10 breaks, all caught after two test fixes): squared norm in eq. (12) (pseudometric, bound, formula), all windows instead of the chunk's (formula, locality), sum instead of mean (bound, formula), no reference subtraction (P4 (c), bound, commutation), no unit-norm check, S as max, kappa against the first sample only, unknown camera names accepted, duplicate windows accepted, boolean masks accepted. Two gaps found and closed: the random pseudometric test alone did not catch the squared norm (random 32-D vectors are nearly orthogonal; a collinear triple now does), and the boolean-mask case was rejected by the duplicate check rather than by its own check (now a 2-entry mask, which has no duplicates).
+
 **WP 1.2: trust-weighted advantages (Step 8.2, eq. (20) into eq. (4), P14; T8; D1). Done (25 Nov).**
 
 | Item | Where | Result |
@@ -104,9 +113,14 @@ Acceptance (1 mm / 0.1 deg): met by a wide margin; the solver tolerance is 1e-6.
 - **WP 1.2: the private `_impute` and `_normalise` are the test-only path for w = 0.** The public functions reject w = 0; tests import the building blocks instead of a bypass flag.
 - **WP 1.2: under B, a distrusted reward still sets the scale.** With w = 0 it leaves the centred returns (P14 (c)) and, under A, the advantages unchanged; under B it still changes them through s_k. Exact neutrality of the advantages is a property of A only (tested, and in the note).
 
+- **WP 1.3: change features are formed per view, then averaged.** The proposal averages the unit-normalised features over cameras before eq. (11); the roadmap asserts unit norm in `change_features`. Both hold in the order per-view `change_features` -> `average_views` -> `d_tilde`, because eq. (11) is linear (tested). The P4 (b) bound still holds after averaging: an average of vectors of norm <= 2 has norm <= 2 (tested).
+- **WP 1.3: the P4 (c) test uses offsets that keep the features unit-normalised.** A generic offset b would be rejected by the unit-norm check. Unit features stay unit under a constant b exactly when they lie in a slice phi . u = beta of the sphere and b = -2 beta u (a reflection); the test builds such features.
+- **WP 1.3: `window_index` takes distinct integer positions only** (the windows T_k of chunk k within the video measured from frame 0, as eq. (16) needs). Boolean masks are rejected, since a short mask would silently be read as indices.
+- **WP 1.3: `grounded_scores` loops over the K twin samples (K^2/2 pairs for kappa)**, calling the same distance as `d_tilde`, so S equals the minimum of `d_tilde` exactly. Cost at production size is (check) once K and the feature size are known (WP 4.2).
+
 ## In progress
 
-Nothing half-done. WP 1.1 and WP 1.2 are closed; the WP 1.1 Windows checks are listed under open problems.
+Nothing half-done. WP 1.1, WP 1.2 and WP 1.3 are closed; the WP 1.1 Windows checks are listed under open problems.
 
 ## Open problems
 
@@ -137,8 +151,10 @@ Nothing half-done. WP 1.1 and WP 1.2 are closed; the WP 1.1 Windows checks are l
 - **The full test suite does not run on Windows.** There are 10 failures and 5 collection errors, all already present before T1: Linux-only calls (`os.getuid`, `fcntl`, `resource`) and missing `rlinf`/`omegaconf`/`scipy`. They are not related to the twin.
 - **Link masses, radii and meshes are placeholders.** UR5 meshes (ROS-Industrial `universal_robot`, check) are needed later for silhouette-based camera fitting (T4).
 
+- **Proposal wording, P4 (b) proof:** it writes ||phi_t|| = 1, but after averaging over cameras ||phi_t|| <= 1. The bound D-tilde <= 4 is unaffected; change "= 2" to "<= 2" in the thesis.
+
 ## Exact next step
 
-**WP 1.3: change features and the distance D-tilde** (`data_free_roadmap.md` §2, Step 4, P4, L5; maths only, no V-JEPA code). Tests first in `tests/test_twin_compare.py` (pseudometric, D-tilde <= 4, invariance to a constant offset, S <= d(theta), kappa = 0 for coincident twin samples), then `src/twin/compare.py` (`change_features`, `d_tilde`, `grounded_scores`, `average_views` keyed by `d405_0_rgb`, `d435_rgb`, `d405_1_rgb`). Read proposal Step 4 and Step 7.2 first.
+**WP 1.4: chunk-0 verdict logic** (`data_free_roadmap.md` §2, Step 6.3-6.4, P8-P11, eq. (19)). Tests first in `tests/test_twin_verdict.py` (partition P11 on a few thousand random inputs with eta >= eta0 enforced, the verdict table case by case, twin always undecided outside its phases, the Chebyshev sign-error bound of P9 on simulated data, `probe_weight` in [w_min, 1], 1 when not probed, monotone in s_W), then `src/twin/verdict.py` (`Label`, `twin_decision`, `pooled_sigma`, `significance`, `verdict`, `combine_probes`, `probe_weight`, `null_action_label`, `candidate_pair_deltas`, `ranking_agreement`; candidate pairs for the audit only). Read proposal Step 6 first.
 
 Still pending once the dataset is available: the **T2 demo check** (convert the recorded actions of the 8 held-out episodes with `actions_to_eef_targets`, run `ActionsToJoints`, compare with the recorded `observation.state` of the following frames, report the error distribution). Settle the `observation.state` question first.
