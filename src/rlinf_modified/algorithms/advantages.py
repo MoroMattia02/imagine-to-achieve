@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import torch
 
+from rlinf_modified.algorithms.trust import (
+    STD_SOURCES,
+    StdSource,
+    trust_weighted_suffix_advantages,
+)
+
 
 def grpo_action_suffix_advantages(
     rewards: torch.Tensor,
@@ -17,6 +23,8 @@ def grpo_action_suffix_advantages(
     *,
     group_size: int,
     gamma: float,
+    weights: torch.Tensor | None = None,
+    std_source: StdSource = "weighted",
 ) -> torch.Tensor:
     """Return group-normalized discounted suffix returns for every chunk.
 
@@ -26,6 +34,10 @@ def grpo_action_suffix_advantages(
         dones: Boolean tensor shaped ``[chunks + 1, trajectories]``.
         group_size: Number of trajectories normalized together.
         gamma: Discount applied between chunks.
+        weights: Optional trust weights ``[chunks, trajectories]`` in (0, 1] (proposal Step 8,
+            eq. (20), P14). ``None`` (default) runs the original computation unchanged.
+        std_source: Scale of decision D1 when ``weights`` is given: ``"weighted"`` (option A,
+            eq. (4), default) or ``"unweighted"`` (option B). See ``trust.py``.
     """
 
     if rewards.ndim != 2:
@@ -41,6 +53,20 @@ def grpo_action_suffix_advantages(
         raise ValueError("gamma must be in [0,1]")
     if not torch.isfinite(rewards).all():
         raise ValueError("rewards contain NaN or Inf")
+    if std_source not in STD_SOURCES:
+        raise ValueError(f"std_source must be one of {STD_SOURCES}, got {std_source!r}")
+    if weights is not None:
+        group_index = torch.arange(rewards.shape[1], device=rewards.device) // group_size
+        advantages, _ = trust_weighted_suffix_advantages(
+            rewards,
+            weights,
+            dones,
+            loss_mask,
+            group_index,
+            gamma=gamma,
+            std_source=std_source,
+        )
+        return advantages
 
     running = torch.zeros(rewards.shape[1], dtype=rewards.dtype, device=rewards.device)
     suffix_returns = torch.empty_like(rewards)

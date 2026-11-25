@@ -4,6 +4,19 @@ Last updated: 25 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_
 
 ## Done
 
+**WP 1.2: trust-weighted advantages (Step 8.2, eq. (20) into eq. (4), P14; T8; D1). Done (25 Nov).**
+
+| Item | Where | Result |
+|---|---|---|
+| Eq. (20) imputation with an explicit group index; suffix returns; D1 scale `"weighted"` (A, default) or `"unweighted"` (B); `TrustStats` (share of w < 1, mean w, std ratio per group and chunk, max \|A\|) | `src/rlinf_modified/algorithms/trust.py` | w = 1: **bit-identical** to `grpo_action_suffix_advantages` (float32 and float64, random dones and masks) and to the cross-rank production formula `validate_and_compute_group_suffix_advantages` (float32, groups scattered over the batch); any w: equal to an independent numpy implementation of eqs. (20) and (4) within 2e-6 |
+| Optional `weights=None, std_source="weighted"` | `src/rlinf_modified/algorithms/advantages.py` | `weights=None` equals a verbatim copy of the pre-WP function bit for bit; no old line changed |
+| D1 derivations (tests 5 and 6, counterexamples) | `docs/thesis/notes/d1_scale_policy.md` | |
+| Tests | `tests/test_trust_weighting.py` (37) | **37 passed**; `test_algorithms_contracts_rewards.py` **9 passed**; twin subset **69 passed** (25 Nov) |
+
+Acceptance covered: (1) w = 1 parity, (2-4) P14 (a), (b), (c) with a test-only w = 0 through the private building blocks, (d); (5) Lemma 1 with shifts per group and chunk, A and B; (6) A: sum of squared advantages = G - 1 for any weights; B (provable version, decided 25 Nov): the scale is independent of the weights, and the last-chunk advantage energy never grows; the per-member counterexample is pinned; (7) other groups bit-identical, and permutation equivariance of the group index.
+
+Sensitivity check (each break reverted; 12 breaks, all caught): plain group mean instead of m_k (P14 (b), (c), reference), down-weighting without imputation (P14, Lemma 1, D1-B), biased std for A (G - 1 identity, parity), eps inside a square root (parity), B using the imputed std (scale test), groups assumed contiguous (cross-rank parity, permutation), masked members left out of m_k (parity), no done cut (parity), zero weights accepted (validation), std ratio inverted (stats), `std_source` dropped by the `advantages.py` option (option test), old path changed to a biased std (frozen-copy test). The last two checks were added during the sensitivity planning, because with w = 1 the two scales coincide and could not reveal a dropped argument.
+
 **WP 1.1: housekeeping, T0 render, viewer script. Done on Linux (25 Nov); the Windows items are (check).**
 
 | Item | Where | Result |
@@ -84,9 +97,16 @@ Acceptance (1 mm / 0.1 deg): met by a wide margin; the solver tolerance is 1e-6.
 - **WP 1.1: the render tests skip, rather than fail, when no OpenGL context can be created.** The check is a bare `mujoco.Renderer`, separate from `TwinRenderer`, so a bug in the twin code still fails. The skip reason is printed by `-ra`; on this machine the tests run (no skip).
 - **WP 1.1: the timing is a `__main__` block in the test file**, so the recorded number comes from the same scene as the tests, without a separate script.
 
+- **WP 1.2: roadmap acceptance 6 for option B replaced (decided with you, 25 Nov).** "Trusted members' advantages do not grow when others are distrusted" is false under A and B (counterexample: 0.97 -> 1.66 under B, 3.47 under A). Tested instead: B's scale does not depend on the weights, and at the last chunk sum_i A_B^2 cannot exceed its full-trust value; the counterexample is pinned. Derivation in `notes/d1_scale_policy.md`.
+- **WP 1.2: weights are validated in (0, 1], or in [w_min, 1] when `w_min` is passed.** Strictly positive weights are what make m_k defined (eq. (20)). The floor itself belongs where the weights are built (WP 1.4, 1.5), so WP 1.5's open question (clip p*g at w_min or not) stays open instead of being decided here.
+- **WP 1.2: all groups must have the same size >= 2**, as in both existing functions (fixed `group_size`). This lets the code gather groups into a `[T, groups, G]` tensor laid out exactly like the old reshape, which is what makes the w = 1 parity bit-exact.
+- **WP 1.2: all members enter m_k, the mean and the std, whatever their loss mask**, as in the existing functions; the mask multiplies the output only. Dtype: computed in the input dtype, returned as float32 times the mask, as before.
+- **WP 1.2: the private `_impute` and `_normalise` are the test-only path for w = 0.** The public functions reject w = 0; tests import the building blocks instead of a bypass flag.
+- **WP 1.2: under B, a distrusted reward still sets the scale.** With w = 0 it leaves the centred returns (P14 (c)) and, under A, the advantages unchanged; under B it still changes them through s_k. Exact neutrality of the advantages is a property of A only (tested, and in the note).
+
 ## In progress
 
-Nothing half-done. WP 1.1 is closed on Linux; its Windows checks are listed under open problems.
+Nothing half-done. WP 1.1 and WP 1.2 are closed; the WP 1.1 Windows checks are listed under open problems.
 
 ## Open problems
 
@@ -98,8 +118,9 @@ Nothing half-done. WP 1.1 is closed on Linux; its Windows checks are listed unde
   - One-minute check where the data lives: `python -c "import json;f=json.load(open('<dataset>/meta/info.json'))['features'];print(f['observation.state'],f['action'])"` (LeRobot usually stores per-channel `names`). Without names: joints look like `-1.57, -1.9, ...`; an EEF pose has xyz within about +-1 m and a 3-value rotvec of norm <= pi.
 - **WP 1.1 on Windows (check).** Run `python -m pytest tests/test_twin_*.py -q` (expect 69 passed; the asset tests should pass since the file is unchanged) and the viewer by hand: `python scripts/twin_view.py`, `--demo-chunk`, `--replay <file>`. MuJoCo's own viewer also works: `python -m mujoco.viewer --mjcf=src/twin/assets/ur5.xml` (flag read from `--help` in 4.0.1; the window was not opened here).
 - **Roadmap references checked on 25 Nov (Phase 1 Step 0), not fixed:**
-  - the proposal PDF (`thesis_proposal_final.pdf`) is not in the repo, so equation, lemma, proposition and assumption numbers in docstrings are taken from the roadmap (check);
-  - `grpo_action_suffix_advantages` takes `(rewards, loss_mask, dones, *, group_size, gamma)`, with contiguous groups, ε = 1e-6 hard-coded, and a float32 cast before the mask. The cross-rank `validate_and_compute_group_suffix_advantages` (`cross_rank_grpo.py:801`) keeps the input dtype and gathers groups with `index_select`; whether the two agree bit for bit is (check, WP 1.2);
+  - the proposal PDF is now at `docs/thesis/thesis_proposal_final.pdf` (local only: `*.pdf` is gitignored). WP 1.2 citations (eq. (4), eqs. (18)-(20), Lemmas 1-2, P14, Step 8.3) were checked against it;
+  - `grpo_action_suffix_advantages` takes `(rewards, loss_mask, dones, *, group_size, gamma)`, with contiguous groups, ε = 1e-6 hard-coded, and a float32 cast before the mask. The cross-rank `validate_and_compute_group_suffix_advantages` (`cross_rank_grpo.py:801`) keeps the input dtype and gathers groups with `index_select`. WP 1.2 verified that both agree bit for bit with the trust-weighted function at w = 1 (float32; member ids in column order within each group);
+  - **Lemma 1 after imputation needs the done boundaries shared within a group** (fixed horizon). Whether production dones always are is (check, WP 5.1);
   - a third suffix-advantage function, `compute_grpo_action_suffix_advantages` (`third_party/rlinf_runtime/rlinf/algorithms/advantages.py:139`, success anchoring and dynamic gammas), is not mentioned in the roadmap; which one production uses for the close config matters for WP 5.1 (check).
 - **Pre-existing ruff findings in `src/twin/robot.py`** (two lines over 100 characters, `zip` without `strict=`) and a missing blank line after two module docstrings; present at `f4f669e`, not touched in WP 1.1.
 - **Gripper clip range** = q01/q99 of the policy action statistics (`action_stats_path`, not in the repo). Needed for exact parity on the gripper channel.
@@ -118,6 +139,6 @@ Nothing half-done. WP 1.1 is closed on Linux; its Windows checks are listed unde
 
 ## Exact next step
 
-**WP 1.2: trust-weighted advantages** (`data_free_roadmap.md` §2, Step 8, T8, D1). Tests first in `tests/test_trust_weighting.py` (the seven acceptance items), then `src/rlinf_modified/algorithms/trust.py` and the optional `weights=None, std_source="weighted"` arguments of `grpo_action_suffix_advantages` (the old path bit-identical, tested). No edit to `cross_rank_grpo.py`. Also `docs/thesis/notes/d1_scale_policy.md`. Run `tests/test_algorithms_contracts_rewards.py` as well.
+**WP 1.3: change features and the distance D-tilde** (`data_free_roadmap.md` §2, Step 4, P4, L5; maths only, no V-JEPA code). Tests first in `tests/test_twin_compare.py` (pseudometric, D-tilde <= 4, invariance to a constant offset, S <= d(theta), kappa = 0 for coincident twin samples), then `src/twin/compare.py` (`change_features`, `d_tilde`, `grounded_scores`, `average_views` keyed by `d405_0_rgb`, `d435_rgb`, `d405_1_rgb`). Read proposal Step 4 and Step 7.2 first.
 
 Still pending once the dataset is available: the **T2 demo check** (convert the recorded actions of the 8 held-out episodes with `actions_to_eef_targets`, run `ActionsToJoints`, compare with the recorded `observation.state` of the following frames, report the error distribution). Settle the `observation.state` question first.
