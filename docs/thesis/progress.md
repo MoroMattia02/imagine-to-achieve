@@ -4,6 +4,25 @@ Last updated: 26 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_
 
 ## Done
 
+**WP 1.5: conformal threshold and divergence chunk (Step 7.3-7.4, eq. (17), P12; eq. (18) and the Step 8.1 soft ablation; calibration rules of Steps 5, 5.3, 7.3). Done (26 Nov). Phase 1 is complete.**
+
+| Item | Where | Result |
+|---|---|---|
+| Rank and threshold: `conformal_rank` (⌈(n+1)(1−α)⌉, 1-based, in exact rationals), `conformal_threshold` (raises for n < (1−α)/α, i.e. n < 9 at α = 0.1) | `src/twin/conformal.py` (numpy, math, fractions) | Coverage, 20,000 seeded calibration sets each. The flag rate on a fresh score is 0.0933 at n = 20, α = 0.1, against the exact 2/21 = 0.0952 and the lower limit 0.0524. It is 0.0959 at n = 9 (exact 0.1) and 0.1983 at n = 49, α = 0.2 (exact 0.2). |
+| Abstention and divergence: `abstains` (κ > κ_max, or outside the phases), `trajectory_score` (eq. (17); −inf if every chunk abstains), `divergence_chunk` (first non-abstaining chunk with S/m > q_α; None = ∞) | | End-to-end coverage of the whole pipeline (m on a fitting set, q on a calibration set, a fresh rollout): at most α. "Flagged iff T > q_α" (P12) holds on 2000 random rollouts, and k* is the first flag. Abstaining chunks never flag. |
+| Weights: `grounded_weights` (hard step; soft = logistic around q_α on the running max), `combined_weights` (eq. (18): w_0 = p_0·g_0, w_k = g_k; no clip) | | Hard g is 1 before k* and w_min from k* on. Soft g stays in [w_min, 1], never increases with k, matches the formula, and tends to the hard step as scale → 0. w ∈ [w_min², 1], with w_min² reached. |
+| Calibration: `split_fit_calibration`, `per_chunk_scale` (median per chunk, fitting half), `calibrate` → `Calibration(m, q_alpha, T_calib)`, `appearance_floor` (η0 = 95th percentile of \|ΔQ_S\|, η = 2η0), `RefereeDefaults(s0=2.0, alpha=0.1)` | | m comes only from the fitting ids and q_α only from the calibration ids. Changing calibration demos leaves m unchanged. Changing a fitting demo without moving a median leaves q unchanged. Ids outside both halves are ignored. Overlapping halves are rejected. |
+| Tests | `tests/test_twin_conformal.py` (36 with parametrisation) | **36 passed** in 1.9 s; twin subset **188 passed**; `test_trust_weighting.py` + `test_algorithms_contracts_rewards.py` **46 passed** (26 Nov) |
+
+Sensitivity check (each break reverted; 28 breaks, all caught):
+- Order statistic: rank with n instead of n + 1, the rank used 0-based, rank in floats (caught only by the case n = 9, α = 0.7, where 1 − 0.7 = 0.30000000000000004 makes the ceiling 4 instead of 3; that case was added for this), the too-few check removed.
+- Eq. (17), abstention, divergence: abstaining chunks entering T, T as a mean, T not normalised by m, κ ≥ κ_max abstaining, the phase map ignored, the last flagged chunk instead of the first, a flag at S/m = q.
+- Eq. (18):
+  - the hard step one chunk late, or only chunk k* distrusted;
+  - soft: per chunk without the running max, abstaining chunks counted, k* consistency unchecked, the logistic's sign flipped;
+  - p_0 applied to every chunk, w clipped.
+- Calibration: mean instead of median, m or q from both halves, overlapping halves accepted, a split that depends on input order or ignores the seed, the appearance floor without abs, η = η0, default α = 0.05.
+
 **WP 1.4: chunk-0 verdict logic (Step 6.3-6.4: Definition 1, eqs. (14)-(15), the verdict table, eq. (19) at chunk 0; P6, P8, P9, P11). Done (26 Nov).**
 
 | Item | Where | Result |
@@ -155,9 +174,23 @@ Acceptance (1 mm / 0.1 deg): met by a wide margin; the solver tolerance is 1e-6.
 
   The rule that makes a pair decisive is left to the audit (WP 5.3).
 
+- **WP 1.5: w = p·g is not clipped at w_min (decided with you, 26 Nov; the roadmap's "ask").** As in eq. (18), w ∈ [w_min², 1]. It goes below w_min only at chunk 0, when the probes failed and the rollout diverged at chunk 0. It is always > 0, so m_k of eq. (20) is defined.
+- **WP 1.5: soft grounded term = logistic around q_α on the running max (decided with you, 26 Nov).** g_k = w_min + (1 − w_min)·σ((q_α − R_k)/scale), where R_k is the running max of S_j/m_j over the non-abstaining chunks j ≤ k, and g_k = 1 while there is none. It keeps "from k* on, distrusted" and tends to the hard step as scale → 0. It needs `q_alpha` and `abstain` in addition to the roadmap's `S, m, scale`. A `k_star` that disagrees with those inputs is rejected, so the hard and soft arms agree on which candidates diverged.
+- **WP 1.5: the conformal rank is computed in exact rationals,** with α read as the decimal it prints as (0.1 is 1/10). Plain floats give ⌈10·(1 − 0.7)⌉ = 4 instead of 3.
+- **WP 1.5: a rollout on which the twin abstains at every chunk has T = −inf and is never flagged.** The same rule applies to calibration demonstrations, so −inf is accepted in `conformal_threshold` (it keeps T exchangeable). Many such demonstrations would lower q_α.
+- **WP 1.5: added beyond the roadmap's list**, so that each rule exists once:
+  - `abstains`: the same abstention rule for calibration and test;
+  - `conformal_rank`;
+  - `calibrate`/`Calibration`: acceptance 5 needs a function that sees the ids;
+  - `combined_weights`: acceptance 4 needs w = p·g as code;
+  - `RefereeDefaults`/`DEFAULTS`: frozen, s0 = 2, α = 0.1.
+- **WP 1.5: split rule.** The ids are sorted, then permuted with `numpy.random.default_rng(seed)`; with an odd count the calibration half gets the extra one; each half is returned sorted. numpy does not promise the same stream across versions, so the split that was used must be recorded with the calibration.
+- **WP 1.5: `per_chunk_scale` takes the median over all fitting demonstrations per chunk**, including chunks where a demonstration abstains, since the proposal does not exclude them (check against Step 7.3's intent). A zero median raises.
+- **WP 1.5: chunks are 0-based (k = 0..N−1); `k* = None` stands for ∞.** `appearance_floor` uses numpy's default (linear) percentile.
+
 ## In progress
 
-Nothing half-done. WP 1.1 to WP 1.4 are closed; the WP 1.1 Windows checks are listed under open problems.
+Nothing half-done. Phase 1 (WP 1.1 to WP 1.5) is closed; the WP 1.1 Windows checks are listed under open problems.
 
 ## Open problems
 
@@ -167,7 +200,7 @@ Nothing half-done. WP 1.1 to WP 1.4 are closed; the WP 1.1 Windows checks are li
   - Which dataset root the policy was trained on is not recorded in the repo, and the dataset is not on this machine.
   - If it holds joints, production seeds Ctrl-World with joint angles as an EEF pose (the saturation bug described in the 2214 comment). It also decides how the twin gets `q0` and `T_WB`: from joints, `T_WB` follows from FK; from EEF only, `q0` comes from `initial_configuration`.
   - One-minute check where the data lives: `python -c "import json;f=json.load(open('<dataset>/meta/info.json'))['features'];print(f['observation.state'],f['action'])"` (LeRobot usually stores per-channel `names`). Without names: joints look like `-1.57, -1.9, ...`; an EEF pose has xyz within about +-1 m and a 3-value rotvec of norm <= pi.
-- **WP 1.1 on Windows (check).** Run `python -m pytest tests/test_twin_*.py -q` (expect 152 passed after WP 1.4; the asset tests should pass since the file is unchanged) and the viewer by hand: `python scripts/twin_view.py`, `--demo-chunk`, `--replay <file>`. MuJoCo's own viewer also works: `python -m mujoco.viewer --mjcf=src/twin/assets/ur5.xml` (flag read from `--help` in 4.0.1; the window was not opened here).
+- **WP 1.1 on Windows (check).** Run `python -m pytest tests/test_twin_*.py -q` (expect 188 passed after WP 1.5; the asset tests should pass since the file is unchanged) and the viewer by hand: `python scripts/twin_view.py`, `--demo-chunk`, `--replay <file>`. MuJoCo's own viewer also works: `python -m mujoco.viewer --mjcf=src/twin/assets/ur5.xml` (flag read from `--help` in 4.0.1; the window was not opened here).
 - **Roadmap references checked on 25 Nov (Phase 1 Step 0), not fixed:**
   - the proposal PDF is now at `docs/thesis/thesis_proposal_final.pdf` (local only: `*.pdf` is gitignored). WP 1.2 citations (eq. (4), eqs. (18)-(20), Lemmas 1-2, P14, Step 8.3) were checked against it;
   - `grpo_action_suffix_advantages` takes `(rewards, loss_mask, dones, *, group_size, gamma)`, with contiguous groups, ε = 1e-6 hard-coded, and a float32 cast before the mask. The cross-rank `validate_and_compute_group_suffix_advantages` (`cross_rank_grpo.py:801`) keeps the input dtype and gathers groups with `index_select`. WP 1.2 verified that both agree bit for bit with the trust-weighted function at w = 1 (float32; member ids in column order within each group);
@@ -203,15 +236,20 @@ Nothing half-done. WP 1.1 to WP 1.4 are closed; the WP 1.1 Windows checks are li
 - **The rule that makes a candidate pair decisive** for the ranking agreement is not in the proposal. Decide it in WP 5.3, e.g. Definition 1 applied to Δ_S over Θ.
 - **Proposal wording, eq. (19):** write the no-verdict case as max(w_min, σ(α_w(log s_W − log s0))), as decided on 26 Nov. Step 8.2's "since w_min > 0, Σ w > 0" relies on this.
 
+- **κ_max has no calibration rule in the proposal** (Step 7.3 uses it; Step 5 does not fix it). `divergence_chunk` takes it as an input.
+- **The abstention rule must be fixed without the calibration half.** κ_max and the phase map (Step 5.2) decide which chunks enter T (eq. (17)). If either is tuned on the calibration demonstrations, the calibration scores are no longer exchangeable with a test rollout's, and P12's guarantee is lost. The proposal does not say which demonstrations Step 5.2 uses. Fitting both on the fitting half keeps P12 (check with you).
+- **The soft term's `scale` has no value yet**; it is an ablation parameter (Step 8.1).
+
 ## Exact next step
 
-**WP 1.5: conformal threshold and divergence chunk** (`data_free_roadmap.md` §2, Step 7, eqs. (17)-(18), P12; Step 5.3 thresholds; Step 8.1 soft ablation). Tests first in `tests/test_twin_conformal.py`:
-- coverage over 20,000 seeded calibration sets of n = 20, with the flag rate in [α − 1/(n+1), α] up to binomial error;
-- abstaining chunks never flag;
-- `grounded_weights` is 1 before k* and w_min from k* on;
-- w = p·g ∈ [w_min², 1]. This is the roadmap's "ask": whether to clip at w_min (O3). Ask before deciding;
-- `per_chunk_scale` uses only the fitting half and `q_alpha` only the calibration half.
+Per the roadmap calendar (29 Nov - 3 Dec): **WP 4.1, then WP 4.2, then WP 2.2.**
+- **WP 4.1, Ctrl-World save/restore and probe re-run (M4):** `scripts/ctrl_world_restore_check.py` builds the env as the close config does, then:
+  - runs `chunk_step(a)`, `get_state()`, `chunk_step(x)` → V1, then `load_state()`, `chunk_step(x)` → V2, and asserts V1 == V2 bitwise;
+  - checks that a different `_common_noise_call_index` changes the output;
+  - adds `probe_rollout(env, actions, seed_index)` on the frames-only path.
 
-Then `src/twin/conformal.py`: `conformal_threshold` (the ⌈(n+1)(1−α)⌉-th smallest, 1-based; raise if n is too small), `trajectory_score`, `divergence_chunk`, `grounded_weights` (with `soft=`), `split_fit_calibration`, `per_chunk_scale`, `appearance_floor`, and the defaults s0 = 2 and α = 0.1. Read proposal Step 7 first.
+  It needs the Ctrl-World checkpoint and a GPU, everything under `/data/moro`. First check whether the checkpoint is on this machine and fits in GPU memory. The line numbers the roadmap quotes are (check). The seed correlation ρ for V12 can be measured here.
+- **WP 4.2, V-JEPA 2 encoder:** `src/twin/features.py` (`VJEPAEncoder`) feeding WP 1.3, and a first representation check on twin renders. It needs a new dependency and weights: **ask first**.
+- **WP 2.2, probe generator and null action (CPU):** `src/twin/probes.py` with tests first in `tests/test_twin_probes.py`. Decide the s_W rule for J probes there (O8).
 
 Still pending once the dataset is available: the **T2 demo check** (convert the recorded actions of the 8 held-out episodes with `actions_to_eef_targets`, run `ActionsToJoints`, compare with the recorded `observation.state` of the following frames, report the error distribution). Settle the `observation.state` question first.
