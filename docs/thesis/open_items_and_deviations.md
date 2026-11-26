@@ -1,6 +1,6 @@
 # Open items and deviations from the plan
 
-Snapshot of 25 Nov 2026, branch `twin` at commit `6855217` (after WP 1.3). It covers T1, T2 (synthetic part) and WP 1.1-1.3 of the data-free roadmap. `progress.md` stays the running log; this file collects in one place:
+Snapshot of 26 Nov 2026, branch `twin`, after WP 1.4 (first version 25 Nov at `6855217`, after WP 1.3). It covers T1, T2 (synthetic part) and WP 1.1-1.4 of the data-free roadmap. `progress.md` stays the running log; this file collects in one place:
 - what is still open;
 - where the implementation departs from, or had to interpret, the plan.
 
@@ -22,11 +22,12 @@ Tags: **[you]** needs your action or decision; **[check]** not verified by runni
 |---|---|---|---|
 | O1 | **What `observation.state` holds in `close_desktop_lerobot_joint_3cam`: joints or an EEF pose** [you]. The repo evidence conflicts (`progress.md`, open problems). One-minute check: `meta/info.json`, features `observation.state` and `action`. | If it holds joints, production seeds Ctrl-World with joint angles read as an EEF pose (the saturation bug noted at `world_model_ctrl_world_env.py:2214`). It also decides how the twin gets `q0` and `T_WB`. | T2 demo check, the twin's start state |
 | O2 | **Lab requests, not sent yet** [you]: UR5 vs UR5e, the 0.18 m TCP and the joint limits (±2π assumed); camera intrinsics and extrinsics; laptop dimensions; gripper geometry; which episodes Ctrl-World was fine-tuned on. | Critical path for T3-T5 and Step 5. | WP 2.3, Phase 3, Phase 6 |
-| O3 | **Clip w = p·g at w_min?** [you, WP 1.5]. The roadmap marks this "ask". The proposal only requires w ∈ [0, 1] with w_min > 0 (eq. (18)), so the product can reach w_min². WP 1.2 deliberately does not enforce a floor, so either answer fits. | Fixes the weight floor seen by the advantages. | WP 1.5 |
-| O4 | **WP 1.1 on Windows** [you, check]: `python -m pytest tests/test_twin_*.py -q` should now give 86 passed. Then the viewer by hand: `python scripts/twin_view.py`, `--demo-chunk`, `--replay <file>`; also `python -m mujoco.viewer --mjcf=src/twin/assets/ur5.xml`. | The asset tests and the viewer were verified on Linux only. | nothing |
+| O3 | **Clip w = p·g at w_min?** [you, WP 1.5]. The roadmap marks this "ask". The proposal only requires w ∈ [0, 1] with w_min > 0 (eq. (18)). Since WP 1.4, p ∈ [w_min, 1] (the no-verdict floor, decided 26 Nov), so the product lies in [w_min², 1]. WP 1.2 deliberately does not enforce a floor, so either answer fits. | Fixes the weight floor seen by the advantages. | WP 1.5 |
+| O4 | **WP 1.1 on Windows** [you, check]: `python -m pytest tests/test_twin_*.py -q` should now give 152 passed (after WP 1.4). Then the viewer by hand: `python scripts/twin_view.py`, `--demo-chunk`, `--replay <file>`; also `python -m mujoco.viewer --mjcf=src/twin/assets/ur5.xml`. | The asset tests and the viewer were verified on Linux only. | nothing |
 | O5 | **Corrections to the plan documents** [you]. These documents are yours, so I did not edit them; see §3. | Avoids re-implementing a wrong statement later. | nothing |
 | O6 | **Pre-existing ruff findings**: two long lines and a `zip` without `strict=` in `src/twin/robot.py`; a missing blank line after two module docstrings; import order in `src/rlinf_modified/algorithms/fpo.py`; a trailing blank line in `advantages.py` [you]. All were present before Phase 1. Fix them in one separate commit, or leave them? | Cosmetic. Fixing the `advantages.py` one touches the old path's file, though not its code. | nothing |
 | O7 | **The proposal PDF is not tracked**: `*.pdf` is gitignored [you]. Use `git add -f docs/thesis/thesis_proposal_final.pdf` if it should be in git. | Equation numbers in docstrings refer to it. | nothing |
+| O8 | **s_W of a candidate with several probes** [you, WP 2.2]. Each probe j has its own s_W,j = \|τ̂_j\|/σ_W, but eq. (19) uses one s_W per candidate. `probe_weight` takes one scalar (decided 26 Nov). Default to evaluate in WP 2.2: the s_W of the direction where the twin predicts the largest effect. If the directions are not labelled, fall back to the max over probes. | Sets the no-verdict weight whenever J > 1 | WP 2.2 |
 
 ### 1.2 To verify later
 
@@ -41,7 +42,10 @@ Tags: **[you]** needs your action or decision; **[check]** not verified by runni
 | V7 | **Render time 0.09-0.10 ms/frame is a lower bound** (7 untextured geoms, one view, RTX 4070). Re-time it with the laptop, textures and three views. | WP 2.3 / WP 3.1 |
 | V8 | **Cost of κ**: K²/2 distances per candidate and chunk. Measure it once K and the feature size are fixed [check]. | WP 4.2 |
 | V9 | **Link masses, radii and meshes are placeholders**; real UR5 meshes are needed for silhouette fitting [check]. | WP 3.3 |
-| V10 | **The full test suite fails on Windows**: 10 failures and 5 collection errors, all present before T1 (Linux-only calls, missing `rlinf`/`omegaconf`/`scipy`); not twin-related. | no action planned |
+| V10 | **The full test suite fails on Windows**: 10 failures and 5 collection errors, all present before T1 (Linux-only calls, missing `rlinf`/`omegaconf`/`scipy`); not twin-related. On Linux, 13 config tests fail because their configs point at placeholder cluster paths (`/path/to/rlinf_release`), also present before Phase 1. | no action planned |
+| V11 | **Which runs enter σ_W, eq. (15)** [check]. The proposal pools "over the n probed candidates, each repeated with R seeds"; whether the probes' runs are pooled as well as the policy action's is not said. `pooled_sigma` takes whatever rows it is given. | WP 2.2 / WP 4.1 |
+| V12 | **False significance of s_W ≥ s0 at R = 2** [check at the real ρ]. s_W divides by the per-seed std of Q, not by the std of τ̂. Simulated under a zero effect (Gaussian, n = 8, s0 = 2): 7.9 % with independent runs, 2.1 % at seed correlation ρ = 0.5, 0.03 % at ρ = 0.9; with R = 4: 0.97 %, 0.07 %, 0 %. The proposal's "two seeds suffice" needs a high ρ. | WP 4.1 (measure ρ) |
+| V13 | **The rule that makes a candidate pair decisive** for the ranking agreement (E1) is not in the proposal; `ranking_agreement` takes the mask as input. For example, Definition 1 applied to Δ_S over Θ. | WP 5.3 |
 
 ---
 
@@ -101,8 +105,23 @@ Each entry gives what the plan says, what was done, and why. **Approved** marks 
 | `window_index` (form not specified) | Distinct integer positions only; boolean masks are rejected | A short boolean mask would silently be read as indices | Review |
 | `average_views` keyed by physical camera name | Any non-empty subset of `PHYSICAL_CAMERAS` is accepted (not necessarily all three); role names like `main` are rejected; views are summed in a fixed order | Allows single-view ablations; the result does not depend on dict order | Review |
 | `grounded_scores -> (S, κ)` | As specified. The per-sample distances d(ϑ) are not returned. It loops over the K samples, calling the same distance as `d_tilde`. | S equals the minimum of `d_tilde` exactly. Cost to be measured (V8). | Review |
-| Proposal eq. (13), scores Q = −D̃; Lemma 5 | No function for Q. Lemma 5 is noted in the module docstring, as a consequence of D̃ ≤ 4. | Not in the WP 1.3 file list; Q is needed from WP 1.4 on | [later WP] 1.4 |
+| Proposal eq. (13), scores Q = −D̃; Lemma 5 | No function for Q. Lemma 5 is noted in the module docstring, as a consequence of D̃ ≤ 4. | Not in the WP 1.3 file list. WP 1.4 also takes scores and score differences as inputs, so Q is first computed where features become scores. | [later WP] 2.2 / 4.2 |
 | Not specified | numpy, float64 internally; unit-norm tolerance 1e-5 | float32 encoder outputs are normalised to about 1e-7 | Review |
+
+### WP 1.4 Chunk-0 verdicts
+
+| Plan says | Done instead | Why | Status |
+|---|---|---|---|
+| Proposal eq. (19), no verdict: p = σ(α_w(log s_W − log s0)), no floor. Roadmap test 5: p ∈ [w_min, 1]. | p = max(w_min, σ(α_w(log s_W − log s0))) | The roadmap and the proposal disagreed. A candidate without a verdict should never weigh less than a proven failure. The floor also keeps w > 0, which eq. (20) and `trust.py` need. Equal to eq. (19) wherever σ(·) ≥ w_min. | **Approved (26 Nov)** |
+| `probe_weight(label, s_w, …)`: one s_W per candidate | Kept as one scalar; the rule for J probes is open (O8) | The proposal defines s_W per probe only | **Approved (26 Nov)** |
+| `combine_probes`: "any failure, then any consistent, then no verdict" | As specified. When several different failures occur, the reported one follows a fixed order: wrong reaction, invents an effect, ignores the action. | Not specified. The order makes the result independent of probe order. All failures get w_min, so it affects only the E1 tables. | Review |
+| Not in the roadmap's file list | `common_seed_effect(q_a[R], q_alt[R])`: the common-seed estimate of P6 | The P9 sign-error test (acceptance 4) then exercises package code | Review |
+| Acceptance 4: simulated d ∼ N(τ, σ²) | Simulated as two common-seed runs (a shared seed effect plus independent noise), with Gaussian and two-point noise, through `common_seed_effect`. Also tested: unbiasedness and variance Var(d)/R (P6). | Exercises the paired structure of P6, not only the mean of a normal sample | Review |
+| Acceptance 1: every input gets exactly one label | The six table cells are written independently from Definition 1 and the table. On 4000 random inputs with boundary values mixed in (τ = 0, ±η0, ±η; s_W = s0; σ = 0), exactly one cell holds and it equals the returned label. Every cell is hit at least 50 times. | A function that returns an Enum always gives one label; the meaningful check is that its label is the only cell that holds | As planned (stricter) |
+| Not specified | σ_W = 0 is allowed: s_W = ∞ for τ̂ ≠ 0, 0 for τ̂ = 0. s0 > 0 is required. | The limits of \|τ̂\|/σ, without a division by zero | Review |
+| Not specified | Strict input checks. `verdict` rejects "significant with sign 0". `probe_weight` needs a label exactly when the candidate is probed. `phase_ok`, `probed` and `w_significant` must be bools. η0 ≥ 0. | Wiring errors fail loudly instead of giving a plausible weight | Review |
+| `null_action_label(score, σ, s0)` | No phase argument: the twin is "sure of no effect" by P8, whatever the phase map. Assumes η0 > 0. The label never enters the weights. | P8; the roadmap signature has no phase | Review |
+| `ranking_agreement(Δ_W, Δ_S, mask)` | Each unordered pair i < m counts once. The mask must be symmetric and boolean. A decisive pair with Δ_S = 0 is rejected. NaN when no pair is decisive. The decisive rule is left to the audit (V13). | Δ is antisymmetric, so (i, m) and (m, i) carry the same information | Review |
 
 ---
 
@@ -113,6 +132,7 @@ Each entry gives what the plan says, what was done, and why. **Approved** marks 
 | `data_free_roadmap.md`, WP 1.2 acceptance 6 | "D1-B: the trusted members' advantages do not grow when other members are distrusted" | False under A and B. Replace with: B's scale is weight-independent, and B's last-chunk advantage energy never grows. See `notes/d1_scale_policy.md`. | WP 1.2 |
 | `data_free_roadmap.md`, WP 1.2 | Mentions two advantage functions | A third, `compute_grpo_action_suffix_advantages` (vendored RLinf), exists; see V2 | Phase 1, Step 0 |
 | Proposal, proof of P4 (b) | "‖cₜ‖ ≤ ‖φₜ‖ + ‖φ_ref‖ = 2" | After averaging over cameras ‖φₜ‖ ≤ 1, so "≤ 2"; the bound D̃ ≤ 4 is unchanged | WP 1.3 |
+| Proposal eq. (19), no-verdict case | σ(α_w(log s_W − log s0)), with no floor | max(w_min, σ(α_w(log s_W − log s0))), as decided on 26 Nov. Step 8.2's "since w_min > 0, Σᵢ w > 0" relies on it. | WP 1.4 |
 | `twin_implementation_plan.md` item 9; guide §1 | main camera = `d435_rgb` | main = `d405_0_rgb`, wrist = `d435_rgb`, side = `d405_1_rgb` | 17 Nov |
 | `twin_detailed_guide.md` (T2 resampling) | Rotation resampled 15→30 Hz by linear axis-angle | The repo uses quaternion slerp | T2 |
 | `twin_detailed_guide.md` | Twist angles marked "(check)" | Confirmed (π/2, 0, 0, π/2, −π/2, 0) from the repo function | T1 |
