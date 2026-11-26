@@ -1,0 +1,807 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{booktabs,tabularx,array}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning}
+\usepackage[most]{tcolorbox}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+\setlist{itemsep=2pt,topsep=3pt}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\clip}{\operatorname{clip}}
+\newcommand{\Ah}{\hat A}
+\newcommand{\Lc}{L_{\mathrm{CFM}}}
+\newcommand{\Lh}{\hat L}
+\newcommand{\Vf}{\mathcal{V}}
+\newcommand{\Qf}{\mathcal{Q}}
+
+\newtcolorbox{newc}[1]{colback=green!4,colframe=green!40!black,fonttitle=\bfseries\small,
+  title={New concept: #1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt}
+\newtcolorbox{intuition}[1][]{colback=blue!3,colframe=blue!40!black,fonttitle=\bfseries\small,
+  title={#1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt}
+\newtcolorbox{paperlink}{colback=gray!5,colframe=gray!55,fonttitle=\bfseries\small,
+  title={In the paper},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt,fontupper=\small}
+
+\title{\textbf{From policy gradients to FPO}\\[2pt]
+\large Reinforcement learning from zero up to the optimiser of \emph{Achieve What You Imagined}}
+\author{\normalsize Study notes for the thesis project}
+\date{20 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+These notes assume Calculus I--II and basic probability, and no background in reinforcement learning (RL), multivariable calculus or generative flow models. They build, in order: the few multivariable tools needed (\cref{sec:toolkit}); the RL problem (\cref{sec:rl}); the two families of methods and why the paper belongs to \emph{policy search} (\cref{sec:families}); policy-gradient methods, from the basic formula to REINFORCE and actor--critic (\cref{sec:pg}); PPO, which makes policy gradients stable and reusable (\cref{sec:ppo}); GRPO, the critic-free variant the paper uses for its advantages (\cref{sec:grpo}); flow models from scratch, starting from differential equations, and why they break PPO (\cref{sec:flow}); and FPO, which repairs PPO for flow models (\cref{sec:fpo}). \Cref{sec:paper} maps every symbol onto Eqs.~(13)--(16) of the paper. Green boxes introduce a concept the first time it appears; grey ``In the paper'' boxes give the corresponding symbol, equation or line of Algorithm~1 in AWYI.
+\end{abstract}
+
+\tableofcontents
+
+\section*{The road map in one paragraph}
+In RL an agent learns from rewards instead of from correct answers. \emph{Policy search} methods improve the agent's decision rule directly; among them, \emph{policy-gradient} methods estimate from samples in which direction to change the weights, without ever differentiating the reward or the environment. \emph{PPO} adds a brake so that each batch can be reused for several small, safe steps. \emph{GRPO} computes the advantages PPO needs by comparing several attempts from the same start, without training a second network. All of these need the log-probability of the sampled action. For a flow model like Cosmos3 that quantity cannot be computed cheaply; \emph{FPO} replaces it with the model's own training loss on the sampled action. The result, in the paper, is a training rule that looks like supervised flow-matching training on the policy's own samples, each weighted by how much better or worse it did than its group.
+
+%=====================================================================
+\section{Mathematical toolkit beyond Calculus I--II}\label{sec:toolkit}
+%=====================================================================
+These notes use a few tools from multivariable calculus (``Calculus III''). This section introduces exactly those, at the level needed, with the one-variable version you already know as the starting point.
+
+\subsection{Vectors and their length}
+\begin{newc}{vector in $\R^n$}
+A list of $n$ real numbers, $z=(z_1,\dots,z_n)$. $\R^n$ is the set of all such lists. Vectors are added and scaled component by component: $(z+w)_j=z_j+w_j$, $(c\,z)_j=c\,z_j$. For $n=2$ a vector is a point (or an arrow from the origin) in the plane; for large $n$ there is no picture, but the rules are the same.
+\end{newc}
+\begin{newc}{norm and squared norm $\|z\|^2$}
+The length of a vector is $\|z\|=\sqrt{z_1^2+\dots+z_n^2}$ (Pythagoras in $n$ dimensions). The \textbf{squared norm} $\|z\|^2=\sum_jz_j^2$ is what appears in losses. $\|z-w\|^2=\sum_j(z_j-w_j)^2$ is the squared distance between two vectors. The \textbf{dot product} is $z\cdot w=\sum_jz_jw_j$; note $\|z\|^2=z\cdot z$.
+\end{newc}
+\begin{paperlink}
+An action chunk is a vector in $\R^{320}$ ($32$ steps $\times$ $10$ numbers). An image with $P$ pixel values is a vector in $\R^P$; the pixel MSE of Eq.~(8) is $\|F-F'\|^2/P$. The Cosmos3 latent $z_{b,i,k}$ is a (very long) vector. The network weights $\theta$ are a vector with millions of entries.
+\end{paperlink}
+
+\subsection{Functions of many variables and partial derivatives}
+\begin{newc}{partial derivative $\partial f/\partial z_j$}
+For a function of several variables, $f(z_1,\dots,z_n)$, the partial derivative with respect to $z_j$ is the ordinary (Calculus I) derivative in $z_j$, treating all other variables as constants. Example: $f(x,y)=x^2y+3y$ gives $\partial f/\partial x=2xy$ and $\partial f/\partial y=x^2+3$. It measures how fast $f$ changes if only $z_j$ is nudged.
+\end{newc}
+\begin{newc}{gradient $\nabla f$}
+The vector of all partial derivatives: $\nabla f(z)=\big(\partial f/\partial z_1,\dots,\partial f/\partial z_n\big)$. Two facts are all we need:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Linear approximation} (the $n$-variable version of $f(x+h)\approx f(x)+f'(x)h$): for a small step $h\in\R^n$, $f(z+h)\approx f(z)+\nabla f(z)\cdot h$.
+\item From (1): among all small steps of a given length, $h$ pointing along $\nabla f$ increases $f$ the most. So $z\leftarrow z+\eta\,\nabla f(z)$ increases $f$ (gradient \emph{ascent}), and $z\leftarrow z-\eta\,\nabla f(z)$ decreases it (gradient \emph{descent}).
+\end{enumerate}
+A subscript says which variables are differentiated: $\nabla_\theta J$ is the gradient of $J$ with respect to the weights $\theta$, all other quantities held fixed. For a neural network it is computed automatically by \textbf{backpropagation}, which is the chain rule applied layer by layer.
+\end{newc}
+Rules from one-variable calculus carry over coordinate by coordinate. For example $\nabla\log f=\nabla f/f$, because $\partial(\log f)/\partial z_j=(\partial f/\partial z_j)/f$ for every $j$. This is the identity behind the log-derivative trick of \cref{sec:pg}.
+
+\subsection{Gaussians in one and many dimensions}
+\begin{newc}{standard Gaussian $\N(0,I)$}
+In one dimension, $\N(m,\sigma^2)$ has density $\frac{1}{\sigma\sqrt{2\pi}}e^{-(x-m)^2/(2\sigma^2)}$, so $\log\N(x;m,\sigma^2)=-\frac{(x-m)^2}{2\sigma^2}+\text{const}$. In $n$ dimensions, $\varepsilon\sim\N(0,I)$ means: a vector whose $n$ entries are \emph{independent} standard normal numbers ($I$ is the identity matrix: variance $1$ in every coordinate, no correlation). Its density is the product of the $n$ one-dimensional densities.
+\end{newc}
+
+
+%=====================================================================
+\section{The reinforcement-learning problem}\label{sec:rl}
+%=====================================================================
+
+\subsection{Agent, environment, interaction}
+\begin{newc}{reinforcement learning (RL)}
+A way of learning to act from \emph{rewards}. In supervised learning (e.g.\ imitation of demonstrations) every input comes with the correct output. In RL nobody gives the correct action: the learner acts, receives a number saying how good the outcome was, and must work out by itself which actions lead to high numbers.
+\end{newc}
+
+\begin{newc}{agent, environment, state, action, reward}
+The \textbf{agent} is the learner that chooses actions. The \textbf{environment} is everything else: it receives the action and responds. At each step $k$: the agent sees the \textbf{state} $s_k$ (or an \textbf{observation} $o_k$ of it, if it cannot see everything), chooses an \textbf{action} $a_k$, and the environment returns a \textbf{reward} $r_k$ (a number) and the next state $s_{k+1}$. The rule by which the environment produces $s_{k+1}$ from $(s_k,a_k)$ is called the \textbf{dynamics}, written $p(s_{k+1}\mid s_k,a_k)$ because it may be random.
+\end{newc}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[>={Stealth[length=2mm]},box/.style={draw,rounded corners=2pt,minimum width=2.8cm,minimum height=1cm,align=center,font=\small}]
+\node[box,fill=blue!8] (ag) at (0,0) {\textbf{Agent}\\ policy $\pi_\theta$};
+\node[box,fill=orange!10] (env) at (7,0) {\textbf{Environment}\\ dynamics $p(s'\mid s,a)$};
+\draw[->,thick] (ag.north) to[bend left=25] node[above,font=\small] {action $a_k$} (env.north);
+\draw[->,thick] (env.south) to[bend left=25] node[below,font=\small,align=center] {next state $s_{k+1}$, reward $r_k$} (ag.south);
+\end{tikzpicture}
+\caption{The RL loop. One pass around the loop is one step $k$.}
+\end{figure}
+
+\begin{newc}{episode, trajectory}
+An \textbf{episode} is one run from a start state to the end (here: a fixed number $N$ of steps). The sequence it produces, $\tau=(s_0,a_0,r_0,s_1,a_1,r_1,\dots,s_{N-1},a_{N-1},r_{N-1})$, is a \textbf{trajectory} (also called a \textbf{rollout}).
+\end{newc}
+
+\begin{paperlink}
+\begin{tabular}{@{}l p{11.2cm}@{}}
+agent & Cosmos3 world-action model (only its action head $\theta_a$ learns)\\
+environment & \textbf{Ctrl-World}, frozen, plus $\mathrm{Ext}_{\mathrm{obs}}$ (Eqs.~4, 6). Not the real robot: training happens entirely in imagination\\
+step $k$ & one \textbf{chunk}: one policy call producing 32 actions at 15\,Hz\\
+state / observation & $o_k$: three camera images (Ctrl-World also keeps image and action history internally, so $o_k$ is an observation, not the full state)\\
+action & $a_k\in\R^{32\times10}$, the whole chunk\\
+dynamics & $o_{k+1}=\mathrm{Ext}_{\mathrm{obs}}\big(W_{\phi^0}(o_k,T_a(a_k))\big)$; random because Ctrl-World samples from noise\\
+reward & $r_k$, Eq.~(10): trajectory agreement (Eq.~8) plus goal term at the last chunk (Eq.~9)\\
+episode & $N=5$ chunks from a start frame of a demonstration; the instruction $g$ is fixed for the episode\\
+trajectory & $X=\{(o_k,a_k,V^C_k,V^W_k)\}_{k=0}^{N-1}$, Section~IV.A\\
+\end{tabular}
+\end{paperlink}
+
+\subsection{Return and discount}
+\begin{newc}{return, discount factor $\gamma$}
+The \textbf{return} from step $k$ is the sum of the rewards still to come, with later rewards weighted less:
+\[G_k=\sum_{j=k}^{N-1}\gamma^{\,j-k}r_j=r_k+\gamma r_{k+1}+\gamma^2r_{k+2}+\dots,\qquad 0\le\gamma\le1.\]
+$\gamma$ is the \textbf{discount factor}. $\gamma=1$: all future rewards count fully; $\gamma$ small: only the near future matters. The return $G_0$ of the whole episode summarises how good the trajectory was.
+\end{newc}
+\begin{paperlink}
+$G_k\leftrightarrow R_{b,i,k}$, Eq.~(11), with $\gamma=0.95$ and $N=5$. The paper calls it the ``discounted suffix return''.
+\end{paperlink}
+
+\subsection{Policies}
+\begin{newc}{policy}
+A \textbf{policy} is the agent's decision rule. In the methods of these notes it is \emph{random}: for a state $s$ it defines a probability distribution $\pi_\theta(a\mid s)$ over actions, and the action is obtained by \emph{sampling} from it, written $a\sim\pi_\theta(\cdot\mid s)$. $\theta$ are the network weights. Two calls in the same state can give different actions. The distribution itself is fixed once $\theta$ and $s$ are fixed; only the draw is random.
+\end{newc}
+Why random? (i) To \emph{explore}: trying slightly different actions is how the agent discovers better ones. (ii) Policy-gradient methods need it: they work by making some actions more probable and others less, which only makes sense if actions have probabilities.
+
+\begin{paperlink}
+$\pi_\theta(a\mid s)\leftrightarrow\Pi^z_\theta(\cdot\mid o_k,g)$, Eq.~(3). The randomness is the starting noise of Cosmos3's sampler: different noise gives different latents $z$, hence different action chunks. This is why the 16 rollouts of a group differ.
+\end{paperlink}
+
+\begin{newc}{expectation $\E$}
+$\E_{x\sim p}[f(x)]$ is the average value of $f(x)$ if $x$ were drawn from $p$ infinitely often: $\sum_xp(x)f(x)$ for discrete $x$, $\int p(x)f(x)\,dx$ for continuous $x$. In practice it is estimated by averaging over the samples actually drawn.
+\end{newc}
+
+\subsection{The objective}
+Running the policy in the environment produces random trajectories. The probability of a trajectory is the product of all the random choices along it:
+\begin{equation}
+p_\theta(\tau)=p(s_0)\prod_{k=0}^{N-1}\pi_\theta(a_k\mid s_k)\,p(s_{k+1}\mid s_k,a_k).
+\label{eq:ptau}
+\end{equation}
+The goal is to maximise the expected return:
+\begin{equation}
+J(\theta)=\E_{\tau\sim p_\theta}\big[G_0(\tau)\big]=\E_{\tau\sim p_\theta}\Big[\sum_{k=0}^{N-1}\gamma^kr_k\Big].
+\label{eq:J}
+\end{equation}
+$J$ is a single number for each choice of weights $\theta$: the average discounted reward the policy would obtain over infinitely many episodes.
+\begin{paperlink}
+Eq.~\eqref{eq:J} is the paper's Eq.~(5): $\theta_a^\star=\arg\max_{\theta_a}\E_{X\sim p_{\theta_a}}\big[\sum_k\gamma^kr_k\big]$, with $p(s_0)$ the reset set of demonstration start frames and the dynamics given by the frozen Ctrl-World. Note that $J$ is measured \emph{inside Ctrl-World}: it is model-space reward, not real-robot success.
+\end{paperlink}
+
+\subsection{Value functions}
+\begin{newc}{value functions $\Vf$, $\Qf$ and advantage $A$}
+\[
+\Vf_k(s)=\E\big[G_k\mid s_k=s\big],\quad
+\Qf_k(s,a)=\E\big[G_k\mid s_k=s,\ a_k=a\big],\quad
+A_k(s,a)=\Qf_k(s,a)-\Vf_k(s).
+\]
+$\Vf_k(s)$, the \textbf{state value}: the return expected from state $s$ at step $k$ if the policy chooses all actions. $\Qf_k(s,a)$, the \textbf{action value}: the same, but the first action is fixed to $a$. $\Vf_k(s)=\E_{a\sim\pi}[\Qf_k(s,a)]$. The \textbf{advantage} $A$ says how much better $a$ is than what the policy does on average from $s$. A single observed return $G_k$ is \emph{one sample} of $\Qf_k(s_k,a_k)$, not the average (like one roll of a die versus its mean $3.5$).
+\end{newc}
+\begin{paperlink}
+The paper never computes $\Vf$ or $\Qf$. They are used here to say what the paper's quantities estimate: $R_{b,i,k}$ is a sample of $\Qf_k(o_{b,i,k},a_{b,i,k})$; the group mean $\mu_{b,k}$ plays the role of $\Vf$ (\cref{sec:grpo}).
+\end{paperlink}
+
+%=====================================================================
+\section{Two families of methods, and why the paper uses policy search}\label{sec:families}
+%=====================================================================
+
+\subsection{Value-based methods}
+\begin{newc}{value-based RL}
+Learn $\Qf(s,a)$ with a network and act by choosing the action with the highest value, $a=\arg\max_a\Qf(s,a)$. The classic algorithm, Q-learning, repeatedly moves $\Qf(s_k,a_k)$ towards $r_k+\gamma\max_{a'}\Qf(s_{k+1},a')$. Its deep version (DQN) learned to play Atari games from pixels.
+\end{newc}
+This works well when there are few possible actions (``left'', ``right'', ``fire''), because the $\arg\max$ is a comparison of a handful of numbers. It becomes impractical when the action is a long vector of continuous numbers: the $\arg\max$ is then an optimisation problem of its own, to be solved at every step.
+
+\subsection{Policy search}
+\begin{newc}{policy search}
+Represent the policy directly by a network $\pi_\theta$ and adjust $\theta$ to increase $J(\theta)$. No value function is needed to \emph{act}: the policy produces actions by itself. There are two ways to adjust $\theta$:
+\begin{itemize}[leftmargin=*]
+\item \textbf{Derivative-free} (e.g.\ evolution strategies, cross-entropy method): perturb the weights randomly, run episodes, keep the perturbations that scored better. Simple, but the number of episodes needed grows with the number of weights; for networks with millions of weights it is hopeless.
+\item \textbf{Gradient-based} (\textbf{policy gradient}): estimate $\nabla_\theta J$ from sampled episodes and take gradient steps. This scales to large networks and is the subject of the rest of these notes.
+\end{itemize}
+\end{newc}
+
+Gradient-based policy search uses \textbf{gradient ascent} (\cref{sec:toolkit}): $\theta\leftarrow\theta+\eta\,\nabla_\theta J$, with $\eta>0$ the \textbf{learning rate}. In practice the optimiser is Adam, which rescales each coordinate of the step, but the direction comes from the gradient.
+
+\subsection{A third route, and why it is not taken}
+If the environment and the reward were \emph{differentiable} (written as networks we can backpropagate through), one could compute $\nabla_\theta J$ directly by the chain rule through the whole rollout: policy $\to$ action $\to$ world model $\to$ reward. Some model-based methods do this with small learned world models.
+\begin{paperlink}
+\textbf{Why AWYI uses policy gradient.}
+\begin{itemize}[leftmargin=*]
+\item The action is a $32\times10=320$-dimensional continuous chunk: a value-based $\arg\max$ over it is impractical.
+\item The starting point is a \emph{pretrained} generative policy (Cosmos3 after supervised fine-tuning). Policy search improves it directly; a value-based method would discard it.
+\item The third route would mean backpropagating through Ctrl-World, a large video diffusion model, over five chunks, plus the decoder and the pixel comparison: very expensive in memory, numerically fragile, and it would let the policy exploit the world model's gradients. The paper explicitly avoids it: the reward and Ctrl-World are treated as a black box, and ``no gradients through the reward computation or the action-conditioned world model'' (Section~IV.E).
+\end{itemize}
+\end{paperlink}
+
+%=====================================================================
+\section{Policy-gradient methods}\label{sec:pg}
+%=====================================================================
+
+\subsection{The core trick, on a single decision}
+Start with the simplest case: one state $s$, one action $a$, one return $R(a)$, so $J(\theta)=\E_{a\sim\pi_\theta(\cdot\mid s)}[R(a)]$. $J$ depends on $\theta$ only through \emph{which actions get sampled}; $R$ itself is a black box. Write the expectation as an integral and differentiate; $R(a)$ does not depend on $\theta$:
+\begin{align}
+\nabla_\theta J
+&=\nabla_\theta\int\pi_\theta(a\mid s)\,R(a)\,da
+=\int\nabla_\theta\pi_\theta(a\mid s)\,R(a)\,da \notag\\
+&=\int\pi_\theta(a\mid s)\,\nabla_\theta\log\pi_\theta(a\mid s)\,R(a)\,da
+=\E_{a\sim\pi_\theta}\big[R(a)\,\nabla_\theta\log\pi_\theta(a\mid s)\big].
+\label{eq:pg}
+\end{align}
+The step to the second line uses $\nabla\pi=\pi\,\nabla\log\pi$ (chain rule for the logarithm); it is called the \textbf{log-derivative trick}. The result is an expectation, so it can be estimated from samples:
+\begin{equation}
+\nabla_\theta J\approx\frac1G\sum_{i=1}^{G}R(a_i)\,\nabla_\theta\log\pi_\theta(a_i\mid s),\qquad a_1,\dots,a_G\sim\pi_\theta(\cdot\mid s).
+\label{eq:pg-est}
+\end{equation}
+Nothing here differentiates $R$. We only need, for each sampled action, the derivative of its \textbf{log-probability}.
+
+\begin{newc}{log-probability $\log\pi_\theta(a\mid s)$}
+The logarithm of the probability (density) the policy assigns to one specific action. $\nabla_\theta\log\pi_\theta(a\mid s)$ is the direction in weight space that makes this action \emph{more likely}. Remember this quantity: the whole difficulty of the paper is that for Cosmos3 it cannot be computed.
+\end{newc}
+
+\begin{intuition}[{Reading Eq.~\eqref{eq:pg-est}}]
+For every sampled action: ``move the weights so that this action becomes more likely, by an amount proportional to its return''. Actions with high return are reinforced more than actions with low return.
+\end{intuition}
+
+\subsection{Whole trajectories: the policy-gradient theorem}
+Apply the same trick to Eq.~\eqref{eq:J}, with $\tau$ in place of $a$ and $p_\theta(\tau)$ in place of $\pi_\theta$:
+\[\nabla_\theta J=\E_{\tau\sim p_\theta}\big[G_0(\tau)\,\nabla_\theta\log p_\theta(\tau)\big].\]
+Take the log of Eq.~\eqref{eq:ptau}:
+\[
+\log p_\theta(\tau)=\log p(s_0)+\sum_k\log\pi_\theta(a_k\mid s_k)+\sum_k\log p(s_{k+1}\mid s_k,a_k).
+\]
+Only the middle sum depends on $\theta$. The start distribution and the \textbf{dynamics drop out of the gradient}:
+\begin{equation}
+\nabla_\theta\log p_\theta(\tau)=\sum_{k=0}^{N-1}\nabla_\theta\log\pi_\theta(a_k\mid s_k).
+\end{equation}
+One more observation: the action at step $k$ cannot influence rewards received \emph{before} $k$. Those rewards only add noise to its gradient and can be removed, which leaves the return from $k$ on:
+\begin{equation}
+\boxed{\ \nabla_\theta J=\E_{\tau\sim p_\theta}\Big[\sum_{k=0}^{N-1}G_k\,\nabla_\theta\log\pi_\theta(a_k\mid s_k)\Big]\ }
+\label{eq:pgt}
+\end{equation}
+This is the \textbf{policy-gradient theorem}. Each step of each trajectory contributes like a single decision, weighted by its \textbf{reward-to-go} $G_k$.
+
+\begin{paperlink}
+Two consequences used by AWYI. (1) The dynamics drop out: the gradient needs neither the derivative nor the probability of Ctrl-World's predictions. A frozen, black-box world model is enough. (2) The reward-to-go is the suffix return Eq.~(11): chunk $k$ is credited with $r_k,\dots,r_{N-1}$, never with earlier rewards.
+\end{paperlink}
+
+\subsection{REINFORCE}
+\begin{newc}{REINFORCE}
+The simplest policy-gradient algorithm (Williams, 1992): (1) run the current policy for some episodes; (2) compute $G_k$ at every step; (3) take one gradient step along the sample average of Eq.~\eqref{eq:pgt}; (4) discard the episodes and repeat. It is \textbf{on-policy}: the data must come from the current weights, because Eq.~\eqref{eq:pgt} is an average under $p_\theta$.
+\end{newc}
+
+\subsection{Baselines and advantages}
+REINFORCE is correct on average but very noisy. If all returns are negative (as in the paper, where rewards are minus pixel errors), every action is made less likely, some less than others; the useful information is only in the \emph{differences}. The fix is to subtract a \textbf{baseline} $b(s)$ that does not depend on the action:
+\begin{equation}
+\E_{a\sim\pi_\theta}\big[b(s)\,\nabla_\theta\log\pi_\theta(a\mid s)\big]
+=b(s)\int\nabla_\theta\pi_\theta(a\mid s)\,da=b(s)\,\nabla_\theta\underbrace{\int\pi_\theta(a\mid s)\,da}_{=1}=0 .
+\end{equation}
+Subtracting a baseline changes nothing on average but can reduce the noise a lot. The natural choice is $b(s_k)=\Vf_k(s_k)$, which turns $G_k$ into an estimate of the advantage:
+\begin{equation}
+\nabla_\theta J=\E\Big[\sum_k\hat A_k\,\nabla_\theta\log\pi_\theta(a_k\mid s_k)\Big],\qquad\hat A_k\approx G_k-\Vf_k(s_k).
+\label{eq:pg-adv}
+\end{equation}
+Positive $\hat A$: the action did better than usual from that state, make it more likely. Negative: less likely.
+
+\subsection{Actor--critic}
+\begin{newc}{actor--critic, critic}
+$\Vf$ is unknown, so it must be estimated. An \textbf{actor--critic} method trains two networks: the \textbf{actor} is the policy $\pi_\theta$; the \textbf{critic} $\Vf_\phi(s)$ is trained by regression to predict the returns, minimising $(\Vf_\phi(s_k)-G_k)^2$. Advantages are then $\hat A_k=G_k-\Vf_\phi(s_k)$ (or refined versions that mix one-step rewards and critic predictions, such as GAE). The cost: a second network to train, which may be as large as the policy, and whose errors bias the advantages.
+\end{newc}
+
+\subsection{Example 1: a one-number policy}\label{sec:ex1}
+A single decision. The action is one number; the policy is a Gaussian (bell curve) with mean $m$ and standard deviation 1: $\pi_m(a)=\N(a;m,1)$, so $\log\pi_m(a)=-\tfrac12(a-m)^2+\text{const}$ and $\partial_m\log\pi_m(a)=a-m$. Start at $m=0$, sample $G=4$ actions, and use as baseline the mean of their returns, dividing also by their standard deviation (this is the GRPO advantage of \cref{sec:grpo}):
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+$i$ & 1 & 2 & 3 & 4\\
+\midrule
+action $a_i$ & $0.8$ & $-0.5$ & $1.2$ & $-1.0$\\
+return $R_i$ & $-1$ & $-3$ & $0$ & $-4$\\
+advantage $\Ah_i=(R_i-\mu)/s$ & $+0.63$ & $-0.63$ & $+1.26$ & $-1.26$\\
+$\partial_m\log\pi(a_i)=a_i-m$ & $0.8$ & $-0.5$ & $1.2$ & $-1.0$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Gradient estimate: $\tfrac14\big(0.63\cdot0.8+(-0.63)(-0.5)+1.26\cdot1.2+(-1.26)(-1.0)\big)\approx0.90>0$. Gradient ascent moves the mean to the right, towards the good actions ($0.8$, $1.2$) and away from the bad ones ($-0.5$, $-1.0$). With learning rate $\eta=0.5$ the new mean is $m'=0.45$.
+\begin{paperlink}
+$m$ plays the role of the action head $\theta_a$; the four $a_i$ of the 16 action chunks $a_{b,i,0}$ of one group; $R_i$ of $R_{b,i,0}$. The difference: for a Gaussian, $\partial_m\log\pi=a-m$ is a formula; for Cosmos3 it is not available.
+\end{paperlink}
+
+\subsection{What vanilla policy gradient lacks}
+REINFORCE and actor--critic are the foundation, and Eq.~\eqref{eq:pg-adv} is the gradient every later method approximates. In practice they have two weaknesses: each batch of episodes supports only one gradient step (on-policy), and the gradient gives a direction but no safe step size. PPO (\cref{sec:ppo}) addresses both. GRPO (\cref{sec:grpo}) then removes the critic. FPO (\cref{sec:fpo}) makes the result usable with a flow model.
+
+%=====================================================================
+\section{PPO: improving the policy in safe steps}\label{sec:ppo}
+
+\subsection{What PPO is, and why it appears here}
+\begin{newc}{PPO (Proximal Policy Optimization)}
+PPO is the most widely used policy-gradient algorithm (Schulman et al., OpenAI, 2017). It is used for robot control, games, and the RL fine-tuning of language models. It is not a new kind of learning: it is the policy gradient of \cref{sec:pg}, plus one mechanism that limits \emph{how much the policy may change} per round of data. ``Proximal'' means exactly this: each new policy must stay close to the previous one.
+\end{newc}
+\textbf{Notation from here on.} The state is written $c$ (for \emph{context}), as in the paper, where $c=(o,g)$; and the formulas are written for a batch of $G$ samples of a single decision, as in \cref{sec:ex1}. For several steps, every step $k$ of every trajectory is simply one more sample, with its own context $c_k$ and advantage $\Ah_k$ (Eq.~\eqref{eq:pg-adv}).
+
+We need PPO because FPO \emph{is} PPO with one ingredient replaced (\cref{sec:fpo}). The ``ratio'' and the ``clip'' in the paper's Eq.~(16) come from here.
+
+\begin{paperlink}
+AWYI uses PPO in its GRPO form (\cref{sec:grpo}): same ratio and clip, advantages from groups instead of a critic. The clipped objective is Eq.~(16).
+\end{paperlink}
+
+\subsection{Two problems with the plain policy gradient}
+\textbf{Problem 1: each batch can be used for only one step.} The estimate in Eq.~\eqref{eq:pg-adv} is valid only for the weights that \emph{produced} the samples: it is an average over actions drawn from $\pi_\theta$. After one gradient step the weights have changed, the samples now come from a policy that no longer exists, and the formula no longer applies. So the plain policy gradient collects a batch, takes one step, throws the batch away and collects a new one. Collecting is the expensive part.
+
+\textbf{Problem 2: the gradient gives a direction, not a safe distance.} In supervised learning a step that is too large is a nuisance: the data stays the same and the next steps correct it. In RL the next batch is sampled \emph{from the new policy}. If one step damages the policy (for example, it makes good actions very unlikely), the next batch contains mostly bad actions, the advantages are computed among bad actions, and training may never recover. A single bad step can collapse training.
+
+\textbf{Example 1, step too large.} In \cref{sec:ex1} the gradient was $0.90$. With learning rate $\eta=0.5$ the mean moves to $0.45$, between the two good actions ($0.8$, $1.2$): sensible. With $\eta=3$ it moves to $2.7$, \emph{beyond} every action ever tried. The new policy now gives the good action $0.8$ only $0.23$ times its old probability and $1.2$ only $0.66$ times: it has overshot, and the good actions became \emph{less} likely. The next batch would be sampled around $2.7$, a region about which the data said nothing.
+
+\textbf{PPO's answer to both:} reuse the same batch for several small steps, and measure, on the batch itself, how much each step changes the probability of each stored action; stop pushing an action once that change exceeds a fixed tolerance. Two tools make this possible: importance sampling (to reuse old samples) and the clip (to limit the change).
+
+\subsection{Tool 1: importance sampling and the probability ratio}
+\begin{newc}{importance sampling}
+A way to compute an average under one distribution using samples from another. For any function $f$,
+\[
+\E_{a\sim\pi_{\mathrm{new}}}[f(a)]=\int\pi_{\mathrm{new}}(a)f(a)\,da=\int\pi_{\mathrm{old}}(a)\,\frac{\pi_{\mathrm{new}}(a)}{\pi_{\mathrm{old}}(a)}\,f(a)\,da=\E_{a\sim\pi_{\mathrm{old}}}\Big[\frac{\pi_{\mathrm{new}}(a)}{\pi_{\mathrm{old}}(a)}\,f(a)\Big].
+\]
+(Multiply and divide by $\pi_{\mathrm{old}}$; nothing else.) \emph{Dice example:} you rolled a fair die many times and want the average score of a loaded die that shows 6 half of the time. Each 6 you rolled counts with weight $\frac{1/2}{1/6}=3$, each other face with weight $\frac{1/10}{1/6}=0.6$. Averaging the weighted scores of the fair rolls gives the loaded die's average, without rolling it.
+\end{newc}
+
+\begin{newc}{behaviour policy $\theta_{\mathrm{old}}$ and probability ratio $\rho$}
+$\theta_{\mathrm{old}}$ are the weights that generated the batch; they are copied and frozen before the update. $\theta$ are the weights being changed. The \textbf{probability ratio} of a stored action is the importance weight above:
+\[\rho_i(\theta)=\frac{\pi_\theta(a_i\mid c)}{\pi_{\theta_{\mathrm{old}}}(a_i\mid c)}=\exp\big(\log\pi_\theta(a_i\mid c)-\log\pi_{\theta_{\mathrm{old}}}(a_i\mid c)\big).\]
+It measures how much the update has changed the policy \emph{on that action}: $\rho=1$ unchanged (always true before the first step); $\rho=1.3$ the new policy produces this action 30\% more often; $\rho=0.7$ 30\% less often.
+\end{newc}
+
+With importance sampling, the stored batch can evaluate \emph{any} nearby $\theta$, not only $\theta_{\mathrm{old}}$. Applied to the advantages it gives the \textbf{surrogate objective}
+\begin{equation}
+L^{\mathrm{PG}}(\theta)=\frac1G\sum_i\rho_i(\theta)\,\Ah_i ,
+\label{eq:surr}
+\end{equation}
+which estimates how much better the policy $\theta$ is than $\theta_{\mathrm{old}}$, using only old samples. It is $0$ at $\theta=\theta_{\mathrm{old}}$ (all $\rho=1$ and the advantages sum to zero) and grows when $\theta$ makes positive-advantage actions more likely and negative-advantage ones less likely. Its gradient at $\theta=\theta_{\mathrm{old}}$ is exactly the policy gradient Eq.~\eqref{eq:pg-adv}, because $\nabla\rho=\rho\,\nabla\log\pi_\theta$ and $\rho=1$ there. This solves problem~1: we can now take several steps on the same batch, each time re-evaluating $\rho$ at the current $\theta$.
+
+\textbf{But it makes problem~2 worse.} Maximising Eq.~\eqref{eq:surr} by itself has no brake: for a positive advantage, the larger $\rho$ the better, without limit. And the estimate is only trustworthy while $\rho$ stays near $1$: if the new policy puts its probability where the old one rarely sampled, there are no samples there and the estimate is meaningless (the $\eta=3$ example).
+
+\subsection{Tool 2: the clip}
+The earlier algorithm TRPO solved this with an explicit mathematical constraint on the distance between new and old policy, which requires heavy second-order computations. PPO replaces it with a simple trick inside the objective:
+\begin{equation}
+J^{\mathrm{PPO}}(\theta)=\frac1G\sum_i\min\Big(\rho_i\Ah_i,\ \clip(\rho_i,1-\epsilon,1+\epsilon)\,\Ah_i\Big),
+\label{eq:ppo}
+\end{equation}
+with a tolerance $\epsilon$, typically $0.1$--$0.3$.
+\begin{newc}{clip and the $\min$}
+$\clip(x,l,u)$ returns $x$ if $l\le x\le u$, otherwise the nearer bound. So $\clip(\rho,1-\epsilon,1+\epsilon)\Ah$ is ``the gain if the ratio could not leave the band $[1-\epsilon,1+\epsilon]$''. The $\min$ takes the \emph{less optimistic} of the true gain and the clipped gain. The result, case by case:
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+advantage & ratio & $\min$ picks & effect on this sample\\
+\midrule
+$\Ah>0$ & $\rho\le1+\epsilon$ & $\rho\Ah$ & keep making the action more likely\\
+$\Ah>0$ & $\rho>1+\epsilon$ & $(1+\epsilon)\Ah$, a constant & \textbf{no gradient}: already moved enough\\
+$\Ah<0$ & $\rho\ge1-\epsilon$ & $\rho\Ah$ & keep making the action less likely\\
+$\Ah<0$ & $\rho<1-\epsilon$ & $(1-\epsilon)\Ah$, a constant & \textbf{no gradient}: already moved enough\\
+\bottomrule
+\end{tabular}
+\end{center}
+Why the $\min$ and not just the clip: if a step accidentally moved a sample the \emph{wrong} way (e.g.\ $\Ah>0$ but $\rho<1-\epsilon$), the $\min$ picks the unclipped term, so the gradient still pulls it back. The clip only removes the incentive to go \emph{further} in the right direction.
+\end{newc}
+
+\begin{intuition}[What PPO does in words]
+For each stored action: ``if it was better than the group, make it more likely, but by at most a factor $1+\epsilon$; if it was worse, make it less likely, but by at most a factor $1-\epsilon$''. The limit is measured per action, on the batch, through $\rho$. Once every action has reached its limit, the batch has nothing more to say, and a new one is collected.
+\end{intuition}
+
+\textbf{Example 1 with PPO.} After the sensible step to $m'=0.45$, the ratios are $1.30,\ 0.72,\ 1.55,\ 0.58$. With $\epsilon=0.2$: samples 1 and 3 ($\Ah>0$) have $\rho>1.2$; samples 2 and 4 ($\Ah<0$) have $\rho<0.8$. All four are clipped, so the gradient on this batch is now zero: PPO would stop here and collect new data. Without the clip, the surrogate would keep growing as $m$ increased, all the way to the overshoot at $2.7$ and beyond.
+
+\subsection{The PPO loop}
+\begin{enumerate}
+\item Copy the weights: $\theta_{\mathrm{old}}\leftarrow\theta$.
+\item Collect a batch with $\theta_{\mathrm{old}}$; for each sample store the context, the action, and $\log\pi_{\theta_{\mathrm{old}}}(a\mid c)$.
+\item Compute the advantages (PPO: from a critic; GRPO, \cref{sec:grpo}: from the group mean). They stay fixed. In original PPO the critic is also updated in this phase, by regression on the returns, and a small bonus for keeping the policy random (an \emph{entropy bonus}) is often added to the objective; neither appears in AWYI.
+\item Split the batch into minibatches. For each: compute $\log\pi_\theta(a\mid c)$ at the current weights, the ratios, the clipped objective Eq.~\eqref{eq:ppo}, and take one gradient step (optionally several passes over the batch).
+\item Go to 1.
+\end{enumerate}
+
+\begin{paperlink}
+This is Algorithm~1 of AWYI. Line~1: $\theta_{a,\mathrm{old}}\leftarrow\theta_a$. Lines~2--11: collect $BGN=640$ chunks with $\theta_{a,\mathrm{old}}$. Line~12: returns and group advantages (Eqs.~11--12). Lines~13--19: one pass over minibatches, one optimiser step each. $\epsilon\leftrightarrow\epsilon_{\mathrm{clip}}$ in Eq.~(16), not reported in the paper (code: \texttt{clip\_ratio\_low/high}). The one ingredient AWYI cannot compute is in step~2 and~4: $\log\pi_\theta(a\mid c)$. Lines~15--16 replace it with a loss. Why, and with what, is the subject of the next two sections.
+\end{paperlink}
+
+%=====================================================================
+\section{GRPO: advantages without a critic}\label{sec:grpo}
+%=====================================================================
+
+\subsection{What GRPO is}
+\begin{newc}{GRPO (Group Relative Policy Optimization)}
+A variant of PPO introduced with the DeepSeekMath language model (Shao et al., 2024) to fine-tune it on math problems, where the reward only says whether the final answer is right. It keeps PPO's ratio and clip and changes \emph{only how the advantages are computed}: instead of a critic network, it samples a \textbf{group} of $G$ attempts from the same starting input and compares each attempt with the others.
+\end{newc}
+
+\subsection{Why drop the critic}
+The critic of \cref{sec:pg} has to learn $\Vf(s)$ from the same noisy returns it is supposed to clean up. This is costly and fragile:
+\begin{itemize}
+\item it is a second large network with its own training, memory and hyperparameters;
+\item when rewards are rare or noisy it learns slowly, and while it is inaccurate it biases every advantage;
+\item for a policy that sees images (or long texts), the critic must understand the same inputs as the policy.
+\end{itemize}
+GRPO replaces the learned estimate of $\Vf$ with a \textbf{Monte Carlo} one: if $G$ attempts start from the same state $s$, their average return estimates $\Vf(s)$ directly.
+
+\begin{newc}{Monte Carlo estimate}
+Estimating an expectation by the average of independent samples. The more samples, the closer the average is to the true value; with $G$ samples the error shrinks like $1/\sqrt G$.
+\end{newc}
+
+\subsection{The group advantage}
+For one start $s$ (one ``question'', one reset), sample $G$ attempts and their returns $R_1,\dots,R_G$. Then
+\begin{equation}
+\Ah_i=\frac{R_i-\mu}{s_R+\delta},\qquad\mu=\frac1G\sum_{j=1}^{G}R_j,\qquad s_R=\Big(\frac1G\sum_j(R_j-\mu)^2\Big)^{1/2},
+\label{eq:grpo-adv}
+\end{equation}
+with $\delta$ a tiny number to avoid dividing by zero. The mean is the baseline ($\approx\Vf(s)$); the division by the standard deviation puts every group on the same scale. These advantages then go into PPO's clipped objective, Eq.~\eqref{eq:ppo}, unchanged.
+
+\begin{intuition}[What the group comparison means]
+An attempt is judged only against its siblings: ``of the $G$ things I tried from here, which ones did better than the others?''. Nothing about the absolute size of the rewards matters, and nothing about other starts.
+\end{intuition}
+
+\paragraph{Original GRPO also has a KL term.} DeepSeekMath adds to the objective a penalty on the \textbf{KL divergence} (a standard measure of how different two probability distributions are) between the current policy and the initial, pre-RL policy, to keep the fine-tuned model close to it. The AWYI objective Eq.~(16) has no such term: only the clip limits the change.
+
+\subsection{Properties that matter for AWYI}
+\begin{itemize}
+\item \textbf{Offsets common to a group cancel.} Adding the same number to all returns of a group changes no advantage. A hard start (all attempts score badly) produces no push in any direction.
+\item \textbf{Scale is lost.} Multiplying a group's returns by any positive number changes nothing either. Every group has advantages with mean $0$ and mean square $1$, whether its returns differed a lot or by almost nothing. Small, meaningless differences (noise) are amplified to full size.
+\item \textbf{A group with identical returns gives no signal}: all advantages are $0$.
+\item \textbf{Cost}: $G$ attempts per start are needed for every update.
+\end{itemize}
+
+\subsection{From one answer to several steps}
+In DeepSeekMath one attempt is one whole answer with one reward, and the same advantage is given to every token of it. AWYI has $N=5$ decisions per attempt and rewards at every step, so it combines GRPO with the reward-to-go of Eq.~\eqref{eq:pgt}: it computes the suffix return of each chunk and normalises \emph{per chunk position}, comparing chunk $k$ of each attempt only with chunk $k$ of its siblings.
+
+\begin{paperlink}
+\begin{tabular}{@{}l p{11cm}@{}}
+group & group $b$: $G=16$ rollouts sharing $o_{b,0}$ and $g_b$ (Eq.~7); $B=8$ groups per update\\
+$R_i$ & $R_{b,i,k}$, suffix return Eq.~(11), one per chunk position\\
+$\mu$, $s_R$, $\delta$ & $\mu_{b,k}$, $s_{b,k}$, $\delta$ in Eq.~(12), computed separately for each $(b,k)$\\
+$\Ah_i$ & $\Ah_{b,i,k}$, Eq.~(12)\\
+KL term & absent in Eq.~(16)\\
+\end{tabular}
+
+\smallskip
+At $k=0$ the 16 rollouts are in the same state, so $\mu_{b,0}$ is a genuine Monte Carlo estimate of $\Vf_0(o_{b,0})$. At $k\ge1$ each rollout is in its own state (its observation comes from its own earlier chunks), so $\mu_{b,k}$ averages over different states: the baseline is no longer the value of each rollout's own state, which adds noise to the advantages of later chunks. The code uses the Bessel-corrected std (divide by $G-1$), a constant factor $\approx1.03$ for $G=16$.
+\end{paperlink}
+
+%=====================================================================
+\section{Flow models from zero, and why PPO cannot be used directly}\label{sec:flow}
+%=====================================================================
+This section builds the generator behind Cosmos3 from things you know: a differential equation from Calculus~II, then the same idea in many dimensions, then the trick that turns it into a generator of samples. One small example in one dimension runs through the whole section and can be checked by hand.
+
+\subsection{What we want: a machine that draws samples}
+A policy must \emph{produce} random actions with the right distribution. For a Gaussian policy (Example~1) this is easy, but a Gaussian has a single peak. Suppose there are two good ways to act, ``go left of the obstacle'' and ``go right''. A Gaussian fitted to both puts its peak in the middle, straight into the obstacle. We need a sampler for distributions with any shape. The idea of a flow model: start from noise that is easy to draw, and \emph{move} each noise sample until, all together, the moved samples have the shape we want.
+
+\begin{paperlink}
+Cosmos3 draws a latent vector $z$ (future video and action chunk together, Eq.~3) this way. That is why its action distribution can have several peaks, and also why its probabilities are hard to compute (\cref{sec:loglik}).
+\end{paperlink}
+
+\subsection{Differential equations in one dimension (Calculus II)}
+An ordinary differential equation (ODE) says how a quantity changes in time:
+\begin{equation}
+\frac{dz}{d\tau}=v(z,\tau),\qquad z(0)=z_0 .
+\label{eq:ode1}
+\end{equation}
+$v(z,\tau)$ is the \textbf{velocity}: if at time $\tau$ the quantity is at $z$, it moves at speed $v(z,\tau)$ (up if positive, down if negative). Given the start $z_0$, the equation determines the whole path $z(\tau)$.
+
+\textbf{Running example.} Take $v(z,\tau)=\dfrac{2-z}{1-\tau}$ for $\tau\in[0,1)$. Try the straight line $z(\tau)=2\tau+(1-\tau)z_0$: its derivative is $2-z_0$, and $\frac{2-z(\tau)}{1-\tau}=\frac{(1-\tau)(2-z_0)}{1-\tau}=2-z_0$. It solves the ODE. Whatever the start, the path is a straight line that reaches $z=2$ at $\tau=1$.
+
+\textbf{Picture: the slope field.} At every point $(\tau,z)$ draw a short arrow with slope $v(z,\tau)$. A solution is a curve that is tangent to the arrows everywhere. \Cref{fig:slope} shows one (for the field built later in \cref{sec:twopoint}).
+
+\begin{newc}{uniqueness: paths do not cross}
+For a smooth $v$, the solution through a given point is unique (a standard theorem). Consequence: two different paths can never pass through the same $z$ at the same $\tau$. If they did, they would have to be the same path from then on. Keep this in mind for \cref{fig:paths}.
+\end{newc}
+
+\subsection{Vector fields: the same thing in $n$ dimensions}
+\begin{newc}{vector field}
+A function that assigns to every point $z\in\R^n$ (and every time $\tau$) a vector $v(z,\tau)\in\R^n$, drawn as an arrow attached to that point. ``Velocity field'' is the same thing when the arrow is read as a velocity.
+\end{newc}
+The ODE \eqref{eq:ode1} is now a system: each coordinate moves with its own component of the arrow,
+\begin{equation}
+\frac{dz_j}{d\tau}=v_j(z_1,\dots,z_n,\tau),\qquad j=1,\dots,n,\qquad\text{written}\qquad\frac{dz}{d\tau}=v(z,\tau).
+\end{equation}
+A point placed in the field is carried along the arrows; its path is a curve in $\R^n$ (a \textbf{trajectory}). Uniqueness still holds: trajectories do not cross.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\linewidth]{figs/field2d.pdf}
+\caption{A vector field in two dimensions, $v(z)=(2-z_1,\,1-z_2)$: every arrow points towards $(2,1)$, longer when farther away. Blue: trajectories from four starting points.}
+\label{fig:field2d}
+\end{figure}
+
+\subsection{Solving an ODE numerically}
+Usually there is no formula for the solution, so it is computed in small time steps. \textbf{Euler's method} uses the velocity at the current point as if it were constant over a step of length $h$:
+\begin{equation}
+z_{\tau+h}=z_\tau+h\,v(z_\tau,\tau).
+\end{equation}
+\textbf{Running example}, start $z_0=-1$, $h=0.25$: at $\tau=0$, $v=3/1=3$, so $z=-0.25$; at $\tau=0.25$, $v=2.25/0.75=3$, so $z=0.5$; then $1.25$; then $2.0$. Four steps reach $2$ exactly, because the true path is a straight line with constant speed: Euler makes no error on straight lines. On curved paths each step cuts the corner and errors accumulate, so either many small steps or a smarter method is needed. Higher-order methods evaluate the velocity at several points and combine them to follow curvature with fewer steps.
+\begin{paperlink}
+Cosmos3 uses \textbf{UniPC}, a higher-order multi-step solver of this kind (\texttt{NativeUniPC}, Algorithm~1 line~5). Its details do not matter for FPO.
+\end{paperlink}
+
+\subsection{A flow moves a whole distribution}
+Now start not one point but many, drawn from $\N(0,1)$, and let each follow the ODE. At every time $\tau$ the moved points have some distribution $p_\tau$: $p_0=\N(0,1)$ by construction, and $p_1$ is whatever the field produces. This is a \textbf{flow}.
+\begin{newc}{flow model}
+A generator defined by a velocity field $v_\theta(z,\tau)$ (a neural network with weights $\theta$). To draw a sample: draw $\varepsilon\sim\N(0,I)$, set $z_0=\varepsilon$, solve $dz/d\tau=v_\theta(z,\tau)$ from $\tau=0$ to $\tau=1$, output $x=z_1$. All the randomness is in $\varepsilon$; the solver is deterministic. Training must choose $\theta$ so that $p_1$ equals the data distribution. For a policy, the network also receives the context: $v_\theta(z,\tau\mid c)$.
+\end{newc}
+
+\subsection{The running example: noise to two points}\label{sec:twopoint}
+Let the ``data'' be two equally likely values, $x=+2$ and $x=-2$ (two good actions). We want a field that carries $\N(0,1)$ onto these two points. The recipe used by flow matching:
+\begin{enumerate}
+\item \textbf{Pair noise with data along straight lines.} Draw $\varepsilon\sim\N(0,1)$ and a data point $x$, and connect them by
+\begin{equation}
+z_\tau=\tau\,x+(1-\tau)\,\varepsilon\qquad(\text{equivalently } z_\tau=x+(1-\tau)(\varepsilon-x)).
+\label{eq:interp}
+\end{equation}
+At $\tau=0$ this is the noise, at $\tau=1$ the data point. Its speed is constant: $dz_\tau/d\tau=x-\varepsilon$.
+\item \textbf{Look at the cloud of all such lines.} At time $\tau$ the points $z_\tau$ have the distribution $p_\tau(z)=\tfrac12\N(z;2\tau,(1-\tau)^2)+\tfrac12\N(z;-2\tau,(1-\tau)^2)$: two bells that start merged into $\N(0,1)$ and shrink onto $\pm2$ (\cref{fig:dens}).
+\item \textbf{Problem: the lines cross} (\cref{fig:paths}, left). A noise value near $0$ may be paired with $+2$ or with $-2$. At a crossing point the ``velocity'' is ambiguous, so the lines themselves are not the trajectories of any velocity field: trajectories cannot cross.
+\item \textbf{Solution: average.} At each point $(z,\tau)$, define the velocity as the \emph{average} velocity of all the lines passing through that point:
+\begin{equation}
+v^\star(z,\tau)=\E\big[\,x-\varepsilon\ \big|\ z_\tau=z\,\big].
+\label{eq:vstar}
+\end{equation}
+\end{enumerate}
+\begin{newc}{conditional expectation $\E[Y\mid Z=z]$}
+The average of $Y$ over only those outcomes where $Z$ takes the value $z$. Here: among all (noise, data) pairs whose line passes through $z$ at time $\tau$, the average of their speeds. A fact from probability you may have seen in regression: \emph{the function $f$ that minimises the mean squared error $\E[(Y-f(Z))^2]$ is $f(z)=\E[Y\mid Z=z]$}. This is why flow matching can be trained by least squares (\cref{sec:cfm}).
+\end{newc}
+For the two-point example \eqref{eq:vstar} can be computed in closed form. Given $z_\tau=z$, the noise is $\varepsilon=(z-\tau x)/(1-\tau)$, so the speed of the line is $x-\varepsilon=(x-z)/(1-\tau)$. Averaging over which data point the line came from, using Bayes' rule with the two Gaussian bells:
+\begin{equation}
+v^\star(z,\tau)=\frac{\E[x\mid z_\tau=z]-z}{1-\tau},\qquad \E[x\mid z_\tau=z]=2\tanh\!\Big(\frac{2\tau z}{(1-\tau)^2}\Big).
+\end{equation}
+(Derivation: $P(x=2\mid z)\propto e^{-(z-2\tau)^2/(2(1-\tau)^2)}$ and $P(x=-2\mid z)\propto e^{-(z+2\tau)^2/(2(1-\tau)^2)}$; their log-ratio is $4\tau z/(1-\tau)^2$, which gives the $\tanh$.) Read it: at each point, move towards the data point you are most likely heading to, at the speed needed to arrive by $\tau=1$. Early on ($\tau$ small) the $\tanh$ is near $0$ and points barely commit; later they commit to the nearer point.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.62\linewidth]{figs/densities.pdf}
+\caption{Distribution $p_\tau$ of the moved points at four times: $\N(0,1)$ at $\tau=0$, two sharp peaks near $\pm2$ by $\tau=0.9$.}
+\label{fig:dens}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{figs/paths.pdf}
+\caption{Left: the straight training lines from noise to data cross. Right: trajectories of the averaged field $v^\star$, solved numerically from 22 starting noise values. They bend, never cross, and end at $+2$ (starts above $0$) or $-2$ (starts below $0$), half each, as the data requires.}
+\label{fig:paths}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.55\linewidth]{figs/slopefield.pdf}
+\caption{Slope field of $v^\star$: the arrow at $(\tau,z)$ has slope $v^\star(z,\tau)$. The trajectories in \cref{fig:paths} (right) follow these arrows.}
+\label{fig:slope}
+\end{figure}
+
+\subsection{Training without knowing $v^\star$: the conditional flow-matching loss}\label{sec:cfm}
+In the example we could compute $v^\star$ because the data were two known points. For real data (all demonstrations of a task, in a space with thousands of dimensions) the average in Eq.~\eqref{eq:vstar} cannot be computed. The conditional-expectation fact above solves this: train a network $v_\theta$ by least squares to predict the speed of random training lines,
+\begin{enumerate}
+\item take a data example $x$, draw $\varepsilon\sim\N(0,I)$ and $\tau\sim\mathcal U(0,1)$ (uniform on $[0,1]$);
+\item form $z_\tau$ by Eq.~\eqref{eq:interp};
+\item minimise
+\begin{equation}
+\Lc(\theta;x,\tau,\varepsilon\mid c)=\big\|v_\theta(z_\tau,\tau\mid c)-(x-\varepsilon)\big\|^2 ,
+\label{eq:cfm}
+\end{equation}
+averaged over many examples and draws.
+\end{enumerate}
+The best possible network under this loss is exactly the averaged field $v^\star$, because a least-squares fit recovers the conditional average. So we never compute $v^\star$; regression on single lines finds it.
+
+\begin{newc}{conditional flow-matching (CFM) loss}
+Eq.~\eqref{eq:cfm}. ``Conditional'' because each target $x-\varepsilon$ belongs to one known line (conditioned on its endpoint $x$); the network, seeing only $(z_\tau,\tau,c)$, learns the average over all lines through that point. After training, following $v_\theta$ from noise (with a solver) produces samples distributed like the data.
+\end{newc}
+
+\begin{paperlink}
+\begin{tabular}{@{}l p{10.6cm}@{}}
+data example $x$ & SFT: latents of demonstrations. FPO: the policy's own latent $z_{b,i,k}=[z^v;z^a]$\\
+velocity field $v_\theta(z,\tau\mid c)$ & $v_{\theta_v^0,\theta_a}(\cdot,\tau\mid c_{b,i,k})$, Eq.~(14): one network, two parameter blocks\\
+ODE & Eq.~(1) of the Preliminaries, same convention ($\tau=0$ noise, $\tau=1$ data)\\
+Eq.~\eqref{eq:interp} & Eq.~(13) without the mask $M$: $z^{(q)}=z+(1-\tau_q)(\varepsilon_q-z)$\\
+target $x-\varepsilon$ & $u^{(q)}=M\odot(z-\varepsilon_q)$\\
+Eq.~\eqref{eq:cfm} & Eq.~(14) for one probe, without the action-only selection $P_a$\\
+\end{tabular}
+\end{paperlink}
+
+\subsection{Why the probability of a sample is expensive}\label{sec:loglik}
+PPO needs $\log\pi_\theta(x\mid c)$, the log-density of a generated sample. Here is what that costs for a flow, first in one dimension, using only the change-of-variables rule from probability.
+
+\textbf{One small step.} Over a short time $h$ the flow maps $z\mapsto g(z)=z+h\,v(z,\tau)$. You know that if $Y=g(Z)$ with $g$ increasing, then $p_Y(g(z))=p_Z(z)/g'(z)$. Here $g'(z)=1+h\,\partial v/\partial z$, so
+\[
+\log p_{\tau+h}\big(z+h\,v\big)=\log p_\tau(z)-\log\Big(1+h\,\frac{\partial v}{\partial z}\Big)\approx\log p_\tau(z)-h\,\frac{\partial v}{\partial z}(z,\tau),
+\]
+using $\log(1+u)\approx u$ for small $u$. Intuition: where the velocity increases with $z$ ($\partial v/\partial z>0$), nearby points move apart, the same probability is spread over more space, and the density drops.
+
+\textbf{The whole path.} Adding up all the small steps along the trajectory from $\varepsilon$ to $x$ (a Riemann sum becoming an integral):
+\begin{equation}
+\log p_1(x)=\log\N(\varepsilon;0,1)-\int_0^1\frac{\partial v}{\partial z}\big(z_\tau,\tau\big)\,d\tau .
+\end{equation}
+\textbf{In $n$ dimensions} the derivative is replaced by the \textbf{divergence}, $\nabla\!\cdot v=\sum_{j=1}^n\partial v_j/\partial z_j$: the sum of how much each coordinate's velocity changes along its own coordinate (the total ``spreading'' of nearby points):
+\begin{equation}
+\log\pi_\theta(x\mid c)=\log\N(\varepsilon;0,I)-\int_0^1\nabla\!\cdot v_\theta(z_\tau,\tau\mid c)\,d\tau .
+\label{eq:loglik}
+\end{equation}
+\textbf{Why this is impractical for Cosmos3.}
+\begin{itemize}
+\item One must recover the starting noise $\varepsilon$ of the sample and follow the whole trajectory again.
+\item At every time step one needs $n$ derivatives of the network's output (one per coordinate of the latent), and $n$ is very large; exact computation is far too costly, and cheap random estimates are noisy.
+\item The formula describes the \emph{exact} ODE, not what UniPC with a finite number of steps actually produced.
+\item For PPO the computation must be repeated, with gradients, at every optimisation step.
+\end{itemize}
+Other RL methods for flows (Flow-GRPO, $\pi$RL) avoid Eq.~\eqref{eq:loglik} by changing the sampler into a sequence of small \emph{random} Gaussian steps, whose probabilities are simple Gaussian densities. That requires replacing the model's sampler. The paper wants to keep Cosmos3's native, deterministic UniPC sampler, so neither route works. FPO (next section) avoids the problem altogether.
+
+%=====================================================================
+\section{FPO: the CFM loss as a stand-in for the log-probability}\label{sec:fpo}
+%=====================================================================
+
+\subsection{The key idea}
+Take a sample $x$ that the model generated, and evaluate the model's own training loss Eq.~\eqref{eq:cfm} \emph{on that sample}, as if it were a training example. Intuitively:
+\begin{itemize}
+\item if the model is likely to generate $x$, then from noisy versions of $x$ its velocity field points back towards $x$ accurately: the loss is \emph{small};
+\item if $x$ is unlikely under the model, the field points elsewhere: the loss is \emph{large}.
+\end{itemize}
+So $-\Lc(\theta;x\mid c)$ behaves like $\log\pi_\theta(x\mid c)$: higher means more likely.
+
+\begin{newc}{ELBO (evidence lower bound)}
+A quantity that is guaranteed to be \emph{at most} the log-probability: $\log\pi_\theta(x\mid c)\ge\mathrm{ELBO}_\theta(x\mid c)$. Diffusion and flow models are trained by maximising an ELBO instead of the log-probability, because the ELBO is cheap. For these models it is known that the denoising loss averaged over noise levels, with a suitable weighting of the levels, equals $-\mathrm{ELBO}$ up to a constant that does not depend on $\theta$. So, up to that weighting,
+\[\log\pi_\theta(x\mid c)\ \approx\ -\kappa\,\Lc(\theta;x\mid c)+C,\qquad\kappa>0.\]
+This is the formal version of the intuition above, and the justification FPO relies on.
+\end{newc}
+
+\subsection{The FPO ratio}
+Replace the log-probabilities in the PPO ratio by minus the loss. The constant $C$ cancels in the difference (and $\kappa$ is absorbed into the scale):
+\begin{equation}
+\hat\rho_i(\theta)=\exp\Big(\Lh_{\theta_{\mathrm{old}}}(x_i\mid c)-\Lh_{\theta}(x_i\mid c)\Big).
+\label{eq:fporatio}
+\end{equation}
+\begin{itemize}
+\item $\hat\rho>1$ $\Leftrightarrow$ the loss on $x_i$ went \emph{down}: the new model ``explains'' this sample better, i.e.\ finds it more likely.
+\item At $\theta=\theta_{\mathrm{old}}$, $\hat\rho=1$, as for the true ratio.
+\item It is a \textbf{surrogate}: it is not the exact probability ratio, only a quantity that moves in the same direction.
+\end{itemize}
+
+\begin{paperlink}
+Eq.~(2) (generic, Preliminaries) and Eq.~(15) (action-head version): $\hat\rho_{b,i,k}(\theta_a)=\exp\big(\hat L^a_{\theta_{a,\mathrm{old}},b,i,k}-\hat L^a_{\theta_a,b,i,k}\big)$. Line~16 of Algorithm~1.
+\end{paperlink}
+
+\subsection{Estimating the loss: probes and common random numbers}
+$\Lc$ in Eq.~\eqref{eq:cfm} depends on the random $(\tau,\varepsilon)$. FPO averages over $Q$ of them:
+\begin{equation}
+\Lh_\theta(x\mid c)=\frac1Q\sum_{q=1}^{Q}\big\|v_\theta(z^{(q)},\tau_q\mid c)-(x-\varepsilon_q)\big\|^2,\qquad z^{(q)}=\tau_q x+(1-\tau_q)\varepsilon_q .
+\label{eq:lhat}
+\end{equation}
+\begin{newc}{probes and common random numbers}
+Each pair $(\tau_q,\varepsilon_q)$ is a \textbf{probe}: one noisy version of the stored sample at which the network is tested. \textbf{Common random numbers} means using \emph{the same} probes for $\Lh_{\theta_{\mathrm{old}}}$ and $\Lh_\theta$. Each loss alone is noisy (it depends a lot on which $\tau,\varepsilon$ were drawn), but most of that noise is identical in the two losses and cancels in their difference. Example: if one probe happens to have very large noise, both losses are large for that probe, and the difference still reflects only the change in the network. With different probes, the difference would be dominated by the probes rather than by the change in $\theta$.
+\end{newc}
+
+\begin{paperlink}
+The probes are $\Omega_{b,i,k}=\{(\tau_q,\varepsilon_q)\}_{q=1}^Q$, ``independent and shared between the behavior and current policies'' (Section~IV.E), stored in line~8 of Algorithm~1. $Q$ is not reported (code: \texttt{fpo.num\_mc\_samples}); the code stores seeds and regenerates $\varepsilon_q$.
+\end{paperlink}
+
+\subsection{The FPO objective}
+Plug the ratio into PPO, Eq.~\eqref{eq:ppo}:
+\begin{equation}
+J^{\mathrm{FPO}}(\theta)=\frac1M\sum_{n=1}^{M}\min\Big(\hat\rho_n\Ah_n,\ \clip(\hat\rho_n,1-\epsilon,1+\epsilon)\,\Ah_n\Big),
+\label{eq:fpo}
+\end{equation}
+with $M$ the number of stored samples. Everything in the clip table of \cref{sec:ppo} carries over.
+
+\begin{paperlink}
+Eq.~(16), with $M=BGN=640$ and $\Ah_n=\Ah_{b,i,k}$ from Eq.~(12). The expectation in Eq.~(16) is this average over all stored chunks.
+\end{paperlink}
+
+\subsection{What the update does, written out}
+Since $\nabla\hat\rho=\hat\rho\,\nabla\log\hat\rho=-\hat\rho\,\nabla\Lh_\theta$, the gradient of Eq.~\eqref{eq:fpo} is
+\begin{equation}
+\nabla_\theta J^{\mathrm{FPO}}=-\frac1M\sum_{n\ \text{not clipped}}\Ah_n\,\hat\rho_n\,\nabla_\theta\Lh_\theta(x_n\mid c_n),
+\end{equation}
+and at the first step ($\theta=\theta_{\mathrm{old}}$, all $\hat\rho=1$, nothing clipped):
+\begin{equation}
+\nabla_\theta J^{\mathrm{FPO}}=-\frac1M\sum_n\Ah_n\,\nabla_\theta\Lh_\theta(x_n\mid c_n).
+\label{eq:fpograd}
+\end{equation}
+Compare with supervised training on demonstrations, whose update direction is
+\[
+-\frac1M\sum_n\nabla_\theta\Lh_\theta(x^{\mathrm{demo}}_n\mid c_n).
+\]
+
+\begin{intuition}[FPO is weighted supervised training on the model's own samples]
+Eq.~\eqref{eq:fpograd} is the ordinary flow-matching update, with two changes: (1) the training examples are actions the model itself generated, not demonstrations; (2) each example is weighted by its advantage. Positive advantage: ``train towards this action'' (its loss goes down, it becomes more likely). Negative advantage: ``train \emph{away} from this action'' (its loss goes up, it becomes less likely). Zero advantage: ignored. The clip stops each sample's influence once it has moved by more than $\epsilon$ in the ratio.
+\end{intuition}
+
+\begin{paperlink}
+Here ``the model'' is only the action head: $\nabla_\theta$ is $\nabla_{\theta_a}$, and the loss is restricted to action coordinates by $P_a$ (\cref{sec:paper}). Positive advantage: Cosmos3 is trained to regenerate action chunk $a_{b,i,k}$ in context $(o_{b,i,k},g_b)$; negative: to avoid it.
+\end{paperlink}
+
+Concretely, in the network: for a sample with positive advantage, the velocity field at the probe points $z^{(q)}$ is pulled towards the direction $x_n-\varepsilon_q$, so future trajectories passing near those points are steered towards $x_n$. With negative advantage it is pushed away from that direction.
+
+\subsection{Why the sampler does not matter}
+Everything above uses only the stored \textbf{endpoint} $x$ and the context $c$. How the solver got there (UniPC, number of steps, guidance) never enters Eqs.~\eqref{eq:fporatio}--\eqref{eq:fpo}. FPO treats the sampler as a black box. This is the property the paper needs.
+
+\subsection{Limits worth knowing}
+\begin{itemize}
+\item The ratio is a surrogate. The relation to the log-probability holds for a particular weighting of the noise levels; implementations choose the weighting empirically (in the code: velocity versus epsilon parameterisation, and a shifted distribution of $\tau$).
+\item With finite $Q$, $\Lh$ is an estimate; common random numbers make the \emph{difference} reliable, not each loss.
+\item The size of $\Lh$ sets how fast $\hat\rho$ changes. A loss summed over many coordinates (Cosmos3's action chunk has $32\times10=320$) changes faster than one averaged over them, so the effective step size depends on this convention together with $\epsilon$ and the learning rate.
+\end{itemize}
+
+
+%=====================================================================
+\section{Mapping onto the paper's Eqs.~(13)--(16)}\label{sec:paper}
+%=====================================================================
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}l l Y@{}}
+\toprule
+These notes & Paper & Remark\\
+\midrule
+sample $x$ & $z_{b,i,k}=[z^v;z^a]$ & joint latent endpoint from UniPC: future-video part $z^v$ and action part $z^a$\\
+context $c$ & $c_{b,i,k}=(o_{b,i,k},g_b)$ & current images and instruction\\
+weights $\theta$ & $(\theta_v^0,\theta_a)$ & $\theta_v^0$ frozen video path, $\theta_a$ trained action head\\
+probe $(\tau_q,\varepsilon_q)$ & $\Omega_{b,i,k}$ & $Q$ probes per stored chunk, shared by old and new policy\\
+Eq.~\eqref{eq:interp} & Eq.~(13) & with a \textbf{mask} $M$, see below\\
+Eq.~\eqref{eq:lhat} & Eq.~(14) & loss on \textbf{action coordinates only} ($P_a$)\\
+Eq.~\eqref{eq:fporatio} & Eq.~(15) & same\\
+Eq.~\eqref{eq:fpo} & Eq.~(16) & average over the $BGN$ chunks\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Two differences from the generic version.}
+\begin{enumerate}
+\item \textbf{The mask $M$ (Eq.~13).} Only some coordinates of the latent are noised: the future-video latents and the valid action coordinates. The conditioning part (the current frame) and padding are left clean, because the model never denoises them. Video is noised together with actions because during sampling Cosmos3 denoises both at the same time; testing the action prediction with clean video would be a situation the network never encounters.
+\item \textbf{Action-only loss (Eq.~14).} $P_a$ keeps only the action coordinates of $v-u$. The network still looks at the video latents (they influence its action prediction), but the loss, and therefore the ratio, measures only how well it explains the \emph{actions}. Gradients go only into $\theta_a$.
+\end{enumerate}
+
+\begin{paperlink}
+\textbf{One update of the paper, in plain steps.}
+\begin{enumerate}[leftmargin=*]
+\item Copy the weights: $\theta_{a,\mathrm{old}}\leftarrow\theta_a$.
+\item Generate $B\cdot G=128$ rollouts of $N=5$ chunks with Cosmos3 (UniPC) and Ctrl-World. For each of the 640 chunks store the endpoint $z$, the context $c$, the probe seeds, and $\Lh_{\mathrm{old}}$.
+\item Compute rewards, returns and group-normalised advantages. From now on they are fixed numbers.
+\item Split the 640 chunks into minibatches. For each minibatch: recompute $\Lh_{\theta_a}$ with the same probes, form $\hat\rho$, evaluate the clipped objective, backpropagate into $\theta_a$, take one optimiser step.
+\item Repeat from 1. About 50 updates per run.
+\end{enumerate}
+\end{paperlink}
+
+%=====================================================================
+\section*{Glossary}
+%=====================================================================
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}l Y >{\raggedright\arraybackslash}p{4.2cm}@{}}
+\toprule
+Term & Meaning & In the paper\\
+\midrule
+RL & learning to act from rewards, without correct answers & post-training of Cosmos3 in imagination\\
+agent, environment & the learner; everything that responds to its actions & Cosmos3; Ctrl-World $+\,\mathrm{Ext}_{\mathrm{obs}}$\\
+state / observation & what the agent sees at step $k$ & $o_{b,i,k}$ (three images)\\
+trajectory, episode & one run of $N$ steps & rollout $X$, $N=5$ chunks\\
+return $G_k$, discount $\gamma$ & discounted sum of rewards from step $k$ & $R_{b,i,k}$, Eq.~(11), $\gamma=0.95$\\
+$J(\theta)$ & expected return of the policy & Eq.~(5)\\
+value-based RL & learn $\Qf$, act by $\arg\max$ & not used\\
+policy search & optimise the policy's weights directly & the approach of the paper\\
+policy-gradient theorem & $\nabla J=\E[\sum_kG_k\nabla\log\pi(a_k\mid s_k)]$; dynamics drop out & why Ctrl-World can stay a black box\\
+REINFORCE & one gradient step per batch along that formula & --\\
+actor--critic, critic & policy plus a network estimating $\Vf$ for the baseline & no critic\\
+Monte Carlo estimate & average of samples as estimate of an expectation & $\mu_{b,k}$\\
+GRPO & PPO with advantages from a group of attempts from the same start & Eq.~(12)\\
+KL divergence & measure of difference between two distributions & no KL term in Eq.~(16)\\
+policy $\pi_\theta(a\mid c)$ & probability distribution over actions given the context; sampling gives an action & Cosmos3 $\Pi^z_\theta(\cdot\mid o,g)$, Eq.~(3)\\
+return $R$ & how good a sampled action turned out, one number (a sample, not an average) & $R_{b,i,k}$, Eq.~(11)\\
+$\Vf$, $\Qf$, advantage & expected return from a state; from a state and action; their difference & not computed; $\mu_{b,k}$ plays $\Vf$\\
+advantage $\Ah$ & return minus baseline (here: group mean), divided by group std & $\hat A_{b,i,k}$, Eq.~(12)\\
+policy gradient & $\E[\Ah\,\nabla\log\pi]$: improve the policy without differentiating the reward & not used directly ($\log\pi$ unavailable)\\
+behaviour policy $\theta_{\mathrm{old}}$ & weights that generated the batch; frozen during the update & $\theta_{a,\mathrm{old}}$, Alg.~1 line~1\\
+ratio $\rho$ & new over old probability of a stored action & replaced by $\hat\rho$, Eqs.~(2), (15)\\
+PPO & policy gradient with the ratio and a clip, so one batch can be used for several steps & the clip in Eq.~(16), $\epsilon_{\mathrm{clip}}$\\
+flow model & generator that moves noise to a sample along a learned velocity field & Cosmos3 WAM; Eq.~(1)\\
+velocity field $v_\theta$ & network giving direction and speed of motion at each point and time & $v_{\theta_v^0,\theta_a}$, Eq.~(14)\\
+CFM loss & regression of $v_\theta$ onto the straight-line direction from noise to a known sample & $\hat L^a$, Eq.~(14)\\
+UniPC & the numerical solver Cosmos3 uses to follow the velocity field & NativeUniPC, Alg.~1 line~5\\
+ELBO & cheap lower bound on the log-probability; the CFM loss is (minus) one, up to weighting & implicit (via the FPO reference [14])\\
+FPO & PPO with $\log\pi$ replaced by $-\Lh$, i.e.\ ratio $\exp(\Lh_{\mathrm{old}}-\Lh)$ & Eqs.~(13)--(16)\\
+probe, common random numbers & noisy versions of the stored sample, identical for old and new loss & $\Omega_{b,i,k}$, $Q$ pairs\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\end{document}
