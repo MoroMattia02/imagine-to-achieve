@@ -39,6 +39,12 @@ dev = [
   "pytest-cov==7.0.0",
   "ruff==0.14.14",
 ]
+# Building the code-docs site only (mkdocs build --strict); not needed to run the code or tests.
+docs = [
+  "mkdocs==1.6.1",
+  "mkdocs-material==9.8.2",
+  "mkdocstrings[python]==1.0.8",
+]
 
 [project.scripts]
 rlinf-modified = "rlinf_modified.train:main"

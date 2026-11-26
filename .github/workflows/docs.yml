@@ -1,0 +1,84 @@
+# Docs (WP D.1): builds the concept book (docs/book, LaTeX) and the code docs (docs/code, MkDocs)
+# and deploys both to GitHub Pages, book.pdf next to the site. No secrets: the deployment uses
+# the job's own token (OIDC).
+# One-time setup on GitHub (see docs/thesis/open_items_and_deviations.md, WP D.1): enable Actions
+# on the fork; Settings > Pages > Source: GitHub Actions; if `twin` is not the default branch,
+# allow it in Settings > Environments > github-pages > deployment branches.
+name: docs
+
+on:
+  push:
+    branches: [twin, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NO_MKDOCS_2_WARNING: "1" # Material's end-of-life banner (stderr, not a build warning)
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # Not `pip install -e .`: the project's dependencies include torch, which the docs do not
+      # need. Versions come from pyproject.toml (docs extra, pytest, numpy); matplotlib is pinned
+      # here because only scripts/make_book_figures.py uses it.
+      - name: Install the docs tools
+        run: |
+          python - > "$RUNNER_TEMP/docs-requirements.txt" <<'EOF'
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              project = tomllib.load(f)["project"]
+          extras = project["optional-dependencies"]
+          pins = extras["docs"] + [r for r in extras["dev"] if r.startswith("pytest==")]
+          pins += [r for r in project["dependencies"] if r.startswith("numpy==")]
+          print("\n".join(pins))
+          EOF
+          echo "matplotlib==3.11.2" >> "$RUNNER_TEMP/docs-requirements.txt"
+          cat "$RUNNER_TEMP/docs-requirements.txt"
+          python -m pip install -r "$RUNNER_TEMP/docs-requirements.txt"
+
+      - name: Docs drift tests
+        run: python -m pytest tests/test_docs.py -q
+
+      - name: Book figures
+        run: python scripts/make_book_figures.py docs/book/figures
+
+      - name: Book PDF
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: main.tex
+          working_directory: docs/book
+
+      - name: Code docs site
+        run: mkdocs build --strict
+
+      - name: Add book.pdf to the site
+        run: cp docs/book/main.pdf site/book.pdf
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

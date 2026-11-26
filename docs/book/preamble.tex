@@ -1,0 +1,56 @@
+% Shared preamble of the concept book (WP D).
+% D.1: packages, colours, the box styles newc and keybox, and the \VC/\VW/\VS notation, taken
+% from the notes in docs/book/import/. D.2 moves the remaining macros of the notes here and
+% resolves name clashes (one notation; every renamed macro listed in its commit message).
+% Equation, step and proposition numbers in the code's docstrings refer to the proposal, not
+% to this book.
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathpazo}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{booktabs,tabularx,longtable,array}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds,shapes.geometric,decorations.pathreplacing}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+\graphicspath{{figures/}}
+
+% Colours of twin_walkthrough.tex, thesis_proposal_final.tex and twin_code_map.tex. They redefine
+% xcolor's "blue" and "orange"; fpo_from_zero.tex and awyi_optimisation.tex used xcolor's own
+% colours, so the boxes of chapters 01-02 change shade (D.2: check).
+\definecolor{navy}{HTML}{14213D}
+\definecolor{blue}{HTML}{2E6F95}
+\definecolor{orange}{HTML}{C96A1B}
+\definecolor{okgreen}{HTML}{2E7D32}
+\definecolor{skelamber}{HTML}{B7791F}
+\definecolor{plangray}{HTML}{6B7280}
+
+\titleformat{\section}{\Large\bfseries\color{navy}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{blue}}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{navy}}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{3pt}
+\setlist{itemsep=2pt,topsep=3pt,leftmargin=1.4em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\emergencystretch=3em
+
+% Boxes. keybox is identical in the three notes that define it. newc is as in the walkthrough and
+% the code map; fpo_from_zero.tex had slightly smaller padding (left/right 4pt, top/bottom 2pt).
+\newtcolorbox{newc}[1]{colback=green!4,colframe=green!40!black,fonttitle=\bfseries\small,
+  title={New concept: #1},boxrule=0.5pt,arc=2pt,left=5pt,right=5pt,top=3pt,bottom=3pt}
+\newtcolorbox{keybox}[1][]{colback=blue!5,colframe=blue!60!black,boxrule=0.6pt,arc=2pt,
+  left=7pt,right=7pt,top=5pt,bottom=5pt,#1}
+
+% The three videos of one chunk (proposal, notation appendix).
+\newcommand{\VC}{V^{C}} % imagined plan video, decoded with the action chunk
+\newcommand{\VW}{V^{W}} % Ctrl-World's predicted video
+\newcommand{\VS}{V^{S}} % the twin's rendered video

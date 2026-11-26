@@ -1,0 +1,99 @@
+# Code docs of the twin and trust-weighting code (WP D.1). Build: mkdocs build --strict
+# The site is built from docs/code/ only; docs/thesis/ and docs/book/ are not part of it.
+site_name: imagine-to-achieve · code docs
+site_description: >-
+  The scene digital twin (src/twin/) and the trust-weighting code: files, dependencies,
+  call flows, data types, tests and the API reference.
+docs_dir: docs/code
+site_dir: site
+watch:
+  - src
+  - scripts/make_code_deps.py
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          # griffe reads the source statically: building the site imports neither torch nor mujoco.
+          paths: [src]
+          options:
+            # Most docstrings are free prose; four use Google "Args:"/"Returns:" sections
+            # (fk, actions_to_eef_targets, trust_weighted_suffix_advantages,
+            # grpo_action_suffix_advantages). Chosen by building with each style (progress.md, D.1).
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: true
+            heading_level: 1
+            members_order: source
+            show_if_no_docstring: true
+            merge_init_into_class: true
+            show_signature_annotations: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            summary: true
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Overview: index.md
+  - Repository layout: layout.md
+  - Dependencies: deps.md
+  - Files: files.md
+  - Call flows: flows.md
+  - Data types: types.md
+  - Testing: testing.md
+  - API reference:
+      - twin.actions: reference/twin.actions.md
+      - twin.cameras: reference/twin.cameras.md
+      - twin.compare: reference/twin.compare.md
+      - twin.conformal: reference/twin.conformal.md
+      - twin.ik: reference/twin.ik.md
+      - twin.init_fit: reference/twin.init_fit.md
+      - twin.render: reference/twin.render.md
+      - twin.repo_import: reference/twin.repo_import.md
+      - twin.robot: reference/twin.robot.md
+      - twin.scene: reference/twin.scene.md
+      - twin.session: reference/twin.session.md
+      - twin.transforms: reference/twin.transforms.md
+      - twin.verdict: reference/twin.verdict.md
+      - rlinf_modified.algorithms.advantages: reference/rlinf_modified.algorithms.advantages.md
+      - rlinf_modified.algorithms.trust: reference/rlinf_modified.algorithms.trust.md

@@ -1,0 +1,34 @@
+% The concept book (WP D): the method, the twin and the trust weighting, with equations,
+% propositions and diagrams. The code is documented separately (docs/code/, MkDocs).
+% Build: make (latexmk -pdf main.tex); CI builds it with .github/workflows/docs.yml and publishes
+% book.pdf next to the code docs. PDFs are never committed.
+\documentclass[11pt,a4paper,oneside]{book}
+\input{preamble}
+
+\begin{document}
+
+\frontmatter
+\begin{titlepage}
+  \centering
+  \vspace*{4cm}
+  {\LARGE\bfseries\color{navy} Checking Imagination Against Physics\par}
+  \vspace{0.8cm}
+  {\large\color{navy} The concept book: method, digital twin and trust weighting\par}
+  \vspace{1.5cm}
+  {\normalsize Master thesis, repository \texttt{imagine-to-achieve}\par}
+  \vfill
+  {\small Built from \texttt{docs/book/} by CI. Step, equation and proposition numbers in the
+  code's docstrings refer to the thesis proposal, not to this book.\par}
+\end{titlepage}
+\tableofcontents
+
+\mainmatter
+\include{chapters/00_overview}
+\include{chapters/01_paper_loop}
+\include{chapters/02_rl_to_fpo}
+\include{chapters/03_method}
+\include{chapters/04_twin}
+\include{chapters/05_trust_weighting}
+\include{chapters/06_decisions}
+
+\end{document}

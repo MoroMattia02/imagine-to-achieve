@@ -26,6 +26,17 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
+# Docs build outputs: MkDocs site, LaTeX intermediates of docs/book (book.pdf is built by CI)
+site/
+docs/book/*.aux
+docs/book/*.fdb_latexmk
+docs/book/*.fls
+docs/book/*.log
+docs/book/*.out
+docs/book/*.synctex.gz
+docs/book/*.toc
+docs/book/chapters/*.aux
+
 # Slurm
 slurm-*.out
 *.err

@@ -4,6 +4,35 @@ Last updated: 26 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_
 
 ## Done
 
+**WP D.1 (`wp_docs_system.md`): docs system skeleton, code docs, dependency-graph generator, CI. Done (26 Nov), except the first CI run, which needs your push and the GitHub setup (O15).**
+
+| Item | Where | Result |
+|---|---|---|
+| `docs` extra: `mkdocs==1.6.1`, `mkdocs-material==9.8.2`, `mkdocstrings[python]==1.0.8` | `pyproject.toml`; installed into `/data/moro/imagine-to-achieve/.venv` | dry run first: only new packages, nothing installed changed |
+| MkDocs site: Material, Mermaid through `pymdownx.superfences`, mkdocstrings with `paths: [src]`, nav in the WP's order, strict link, anchor and nav validation | `mkdocs.yml`; `docs/code/` (7 pages and 15 API pages) | `mkdocs build --strict`: **0 warnings**, 1.0 s. Builds with imports of torch, mujoco, numpy, twin, rlinf_modified and rlinf blocked: **no attempt** recorded. The API pages show every public docstring of `twin.ik` (13), `twin.actions` (10), `twin.compare` (5) and `trust` (6) (and `verdict`, `conformal`) |
+| `docstring_style` | `mkdocs.yml` | **google**: built with google, numpy, sphinx, auto and none (0 warnings each); only google renders the four `Args:`/`Returns:` docstrings as tables, and prose renders as with no parsing. Two docstrings render badly under every style (O16) |
+| Code docs ported from `twin_code_map.tex`, updated to the current commit | `index.md`, `layout.md`, `deps.md`, `files.md`, `flows.md`, `types.md`, `testing.md` | compare, verdict, conformal added everywhere. The integration sequence (from the walkthrough) is a `sequenceDiagram`, with line numbers re-checked: only the env worker range changed. Call trees are `flowchart TD/LR`, the folder tree a code block |
+| Generator | `scripts/make_code_deps.py` (stdlib, `ast`) | Mermaid graph and name table between the markers of `deps.md`; lazy edges dotted, torch, mujoco and `eef_pose_adapter.py` (by path) dashed; deterministic (a rerun writes nothing); `--check`. The generated name table equals the code map's hand-made one, plus `compare → cameras` |
+| Drift tests | `tests/test_docs.py` (13, stdlib only) | **failing first: 11 failed, 1 passed** (the link-regex self-test) before any docs existed; now **13 passed** in 0.08 s |
+| Book skeleton | `docs/book/main.tex`, `preamble.tex`, `chapters/00-06`, `figures/README.md`, `Makefile` | not compiled: no TeX on this machine (`latexmk: command not found`, no `pdflatex`). Braces and environments balance; the chapter structure is tested (V18) |
+| CI | `.github/workflows/docs.yml` | YAML parsed; the install step run locally prints the expected pins. Not run (V18, V19) |
+| Definition of done | `CLAUDE.md` | added verbatim, with the docs commands |
+| Tests (26 Nov) | | docs **13 passed**; twin subset **188 passed**; `PYTHONPATH=third_party/rlinf_runtime`, `test_trust_weighting.py` + `test_algorithms_contracts_rewards.py`: **46 passed** |
+
+Acceptance "changing an import without rerunning the generator fails". One added import in `compare.py` (`from twin.transforms import skew`) gave `test_deps_block_equals_a_fresh_run` FAILED (1 failed, 12 passed), and `make_code_deps.py --check` exited 1. After `git checkout` the file equals HEAD and the tests give 13 passed.
+
+Sensitivity check (each break reverted; 10 breaks, all caught):
+- `test_docs.py`, eight breaks, each caught by its own test:
+  - a `files.md` heading renamed;
+  - a reference page emptied;
+  - a link broken;
+  - a nav entry removed;
+  - chapter 04 dropped from `main.tex`;
+  - the generator counting lazy imports as eager (3 tests);
+  - a new undocumented module (5 tests);
+  - a lazy import cycle `robot → ik` (2 tests).
+- `mkdocs build --strict`: a broken anchor and a page missing from the nav each abort the build.
+
 **WP 1.5: conformal threshold and divergence chunk (Step 7.3-7.4, eq. (17), P12; eq. (18) and the Step 8.1 soft ablation; calibration rules of Steps 5, 5.3, 7.3). Done (26 Nov). Phase 1 is complete.**
 
 | Item | Where | Result |
@@ -188,9 +217,15 @@ Acceptance (1 mm / 0.1 deg): met by a wide margin; the solver tolerance is 1e-6.
 - **WP 1.5: `per_chunk_scale` takes the median over all fitting demonstrations per chunk**, including chunks where a demonstration abstains, since the proposal does not exclude them (check against Step 7.3's intent). A zero median raises.
 - **WP 1.5: chunks are 0-based (k = 0..N−1); `k* = None` stands for ∞.** `appearance_floor` uses numpy's default (linear) percentile.
 
+- **WP D.1: the site is built from `docs/code/` only** (`docs_dir`), not from `docs/`, which also holds the thesis notes, the `.tex` sources and a run output. Repo files outside `docs/code/` are named as code paths, not linked, because MkDocs cannot serve them. `book.pdf` is linked with raw HTML, since it exists only on the deployed site.
+- **WP D.1: CI does not install the project.** Its dependencies include torch, and the docs need none of it. The pins come from `pyproject.toml` (docs extra, pytest, numpy); matplotlib is pinned in the workflow (O18). A build in CI therefore also proves that the API pages need neither torch nor MuJoCo.
+- **WP D.1: the generator documents `src/twin/*.py` without `__init__.py`**, and it also writes a table of the imported names, so that the graph's edges can be read without opening the code.
+- **WP D.1: source docstrings were not edited.** The two rendering defects found (O16) are listed with their one-line fixes.
+- **WP D.1: the chapter skeletons carry their sources' section headings**, so that the PDF shows the structure and D.2 sees where each body goes. The macro clashes D.2 must resolve are listed in `open_items_and_deviations.md` (§2, WP D.1).
+
 ## In progress
 
-Nothing half-done. Phase 1 (WP 1.1 to WP 1.5) is closed; the WP 1.1 Windows checks are listed under open problems.
+Nothing half-done. Phase 1 (WP 1.1 to WP 1.5) and WP D.1 are closed; the WP 1.1 Windows checks are listed under open problems. D.1's first CI run (book PDF, deployment) waits for your push and the GitHub setup (O15).
 
 ## Open problems
 
@@ -240,9 +275,16 @@ Nothing half-done. Phase 1 (WP 1.1 to WP 1.5) is closed; the WP 1.1 Windows chec
 - **The abstention rule must be fixed without the calibration half.** κ_max and the phase map (Step 5.2) decide which chunks enter T (eq. (17)). If either is tuned on the calibration demonstrations, the calibration scores are no longer exchangeable with a test rollout's, and P12's guarantee is lost. The proposal does not say which demonstrations Step 5.2 uses. Fitting both on the fitting half keeps P12 (check with you).
 - **The soft term's `scale` has no value yet**; it is an ablation parameter (Step 8.1).
 
+- **WP D.1, before your push (O15):** enable Actions on the fork; set Pages → Source: GitHub Actions; use a token with *Workflows: Read and write*; and, if `twin` is not the default branch, allow it in the `github-pages` environment (check).
+- **WP D.1, not verified here:** the book compile and `make_book_figures.py` (no TeX, no matplotlib on this machine; V18), and the Mermaid drawings and the deployment (V19). All first happen in CI.
+- **WP D.1, two docstrings render badly** (`verdict.verdict`'s table, the `Returns:` of `trust_weighted_suffix_advantages`; O16), and **Step 8 would appear in chapters 03 and 05** (O17, decide before D.2).
+- **The trust subset needs `PYTHONPATH=third_party/rlinf_runtime`:** `test_algorithms_contracts_rewards.py` imports `rlinf.rewards` (O14).
+
 ## Exact next step
 
-Per the roadmap calendar (29 Nov - 3 Dec): **WP 4.1, then WP 4.2, then WP 2.2.**
+**WP D.2 first** (`wp_docs_system.md`: "D.2 right after" D.1): port `docs/book/import/` into the chapters without rewriting, then delete the folder. Settle O17 (Step 8 in chapters 03 and 05) first. Resolve the macro clashes listed in `open_items_and_deviations.md` §2, WP D.1 (`\Lh`, `newc`, `blue`/`orange`). `make_book_figures.py` already exists; matplotlib is needed to run it locally (ask, O18). `twin_code_map.tex` is already ported into `docs/code/`, so it has no chapter.
+
+Then, per the roadmap calendar (29 Nov - 3 Dec): **WP 4.1, then WP 4.2, then WP 2.2.**
 - **WP 4.1, Ctrl-World save/restore and probe re-run (M4):** `scripts/ctrl_world_restore_check.py` builds the env as the close config does, then:
   - runs `chunk_step(a)`, `get_state()`, `chunk_step(x)` → V1, then `load_state()`, `chunk_step(x)` → V2, and asserts V1 == V2 bitwise;
   - checks that a different `_common_noise_call_index` changes the output;
