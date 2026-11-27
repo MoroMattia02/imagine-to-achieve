@@ -16,6 +16,10 @@ method looks the way it does (equations, propositions, decisions) is in the conc
 | [Testing](testing.md) | how to run the tests, and which test covers what |
 | API reference | generated from the docstrings, one page per module (menu on the left) |
 
+**Diagrams.** Hover over a diagram for its buttons: zoom in, zoom out, reset, full screen.
+Ctrl/Cmd + wheel (or a trackpad pinch) zooms at the pointer, drag pans a zoomed diagram, and
+double-click resets it.
+
 **Status markers.** *implemented*: code and tests exist. *skeleton*: signatures exist, bodies raise
 `NotImplementedError`. *planned*: not in the repo yet; the roadmap work package (WP) is named.
 *(check)* marks what was inferred, not run.

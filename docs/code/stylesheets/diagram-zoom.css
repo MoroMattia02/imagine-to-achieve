@@ -1,0 +1,98 @@
+/* Zoom and pan for the Mermaid diagrams (javascripts/diagram-zoom.js). Colours come from
+   Material's variables, so light and dark mode both work. */
+
+.md-typeset .diagram-zoom {
+  position: relative;
+  margin: 1em 0; /* takes over the margin Material puts on .mermaid */
+  overflow: hidden;
+  border-radius: 0.1rem;
+}
+
+.md-typeset .diagram-zoom .mermaid {
+  margin: 0;
+}
+
+.diagram-zoom__stage {
+  transform-origin: 0 0;
+}
+
+.diagram-zoom.is-moved {
+  outline: 1px solid var(--md-default-fg-color--lightest);
+  cursor: grab;
+  touch-action: none;
+}
+
+.diagram-zoom.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.diagram-zoom__toolbar {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 1;
+  display: flex;
+  gap: 0.15rem;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.diagram-zoom:hover .diagram-zoom__toolbar,
+.diagram-zoom:focus-within .diagram-zoom__toolbar,
+.diagram-zoom.is-moved .diagram-zoom__toolbar,
+.diagram-zoom:fullscreen .diagram-zoom__toolbar {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .diagram-zoom__toolbar {
+    opacity: 1; /* touch screens have no hover */
+  }
+}
+
+.diagram-zoom__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.1rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  cursor: pointer;
+}
+
+.diagram-zoom__button:hover,
+.diagram-zoom__button:focus-visible {
+  border-color: currentcolor;
+  color: var(--md-accent-fg-color);
+}
+
+.diagram-zoom__button svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.md-typeset .diagram-zoom:fullscreen {
+  margin: 0;
+  border-radius: 0;
+  background: var(--md-default-bg-color);
+}
+
+.diagram-zoom:fullscreen .mermaid {
+  text-align: center;
+}
+
+@media print {
+  .diagram-zoom__toolbar {
+    display: none;
+  }
+}

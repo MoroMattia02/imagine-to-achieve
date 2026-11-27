@@ -30,6 +30,12 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 
+# Zoom, pan and full screen for the Mermaid diagrams (files under docs/code/).
+extra_css:
+  - stylesheets/diagram-zoom.css
+extra_javascript:
+  - javascripts/diagram-zoom.js
+
 markdown_extensions:
   - admonition
   - attr_list

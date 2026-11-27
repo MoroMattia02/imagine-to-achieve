@@ -39,6 +39,6 @@ python -m pytest tests/ -q                                  # everything (see th
 | `test_twin_conformal.py` | `conformal` | coverage of q_α on 20,000 calibration sets; P12 "flagged iff T > q_α"; k* is the first flag; hard and soft g; w ∈ [w_min², 1]; m only from fitting ids, q only from calibration ids | 36 |
 | `test_trust_weighting.py` | `trust`, `advantages` | w = 1 parity with both existing functions (bit for bit); P14; Lemma 1; D1 options A and B | 37 |
 | `test_algorithms_contracts_rewards.py` | `advantages`, `fpo`, contracts, rewards | finite GRPO/PPO losses; reward helpers (pre-existing) | 9 |
-| `test_docs.py` | these pages, `make_code_deps.py`, the book skeleton | `deps.md` block current; a section and an API page per module; links resolve; no import cycle; the generator on a synthetic package; `main.tex` includes the seven chapters | 13 |
+| `test_docs.py` | these pages, `make_code_deps.py`, the book skeleton | `deps.md` block current; a section and an API page per module; links resolve; the extra CSS and JavaScript files exist; no import cycle; the generator on a synthetic package; `main.tex` includes the seven chapters | 14 |
 
 The twin subset is 188 tests (26 Nov 2026).

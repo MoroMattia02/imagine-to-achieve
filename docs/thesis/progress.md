@@ -18,6 +18,7 @@ Last updated: 26 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_
 | CI | `.github/workflows/docs.yml` | YAML parsed; the install step run locally prints the expected pins. Not run (V18, V19) |
 | Definition of done | `CLAUDE.md` | added verbatim, with the docs commands |
 | Tests (26 Nov) | | docs **13 passed**; twin subset **188 passed**; `PYTHONPATH=third_party/rlinf_runtime`, `test_trust_weighting.py` + `test_algorithms_contracts_rewards.py`: **46 passed** |
+| Zoomable diagrams (your request, after D.1) | `docs/code/javascripts/diagram-zoom.js`, `docs/code/stylesheets/diagram-zoom.css`, `mkdocs.yml` | Zoom buttons, Ctrl/Cmd + wheel at the pointer, drag to pan, double-click to reset, full screen (shrinks a diagram taller than the screen). Headless Firefox 160 driven through Marionette on the built site: **21 checks passed** (all 10 diagrams of `flows` and `deps` wrapped; the point under the pointer stays fixed; plain wheel still scrolls the page; Esc leaves full screen and resets; dark mode). Not tested: the toolbar showing only on hover, because headless Firefox reports `(hover: none)` and shows it always (check on a desktop). A new docs test checks that the two files exist: docs **14 passed** |
 
 Acceptance "changing an import without rerunning the generator fails". One added import in `compare.py` (`from twin.transforms import skew`) gave `test_deps_block_equals_a_fresh_run` FAILED (1 failed, 12 passed), and `make_code_deps.py --check` exited 1. After `git checkout` the file equals HEAD and the tests give 13 passed.
 

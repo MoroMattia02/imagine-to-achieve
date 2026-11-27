@@ -239,6 +239,18 @@ def test_no_reference_page_for_a_module_that_does_not_exist():
     assert pages == sorted(_documented_modules())
 
 
+def test_extra_css_and_javascript_exist():
+    """mkdocs does not warn about a missing extra_css/extra_javascript file; the page just 404s."""
+    config = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    assets = []
+    for key in ("extra_css", "extra_javascript"):
+        block = re.search(rf"^{key}:\n((?:[ \t]+- .+\n)+)", config, re.M)
+        assert block, f"mkdocs.yml has no {key} list"
+        assets += re.findall(r"^[ \t]+- (\S+)", block.group(1), re.M)
+    missing = [a for a in assets if not (CODE_DOCS / a).is_file()]
+    assert not missing, f"listed in mkdocs.yml but not in docs/code/: {missing}"
+
+
 def test_nav_lists_every_reference_page():
     config = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
     missing = [m for m in _documented_modules() if f"reference/{m}.md" not in config]
