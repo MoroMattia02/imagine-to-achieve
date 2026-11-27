@@ -1,8 +1,142 @@
-% Chapter 05. Sources: the proposal's Step 8 material, then docs/thesis/notes/d1_scale_policy.md
-% converted to LaTeX (D.2). Skeleton from WP D.1. Open for D.2: chapter 03 takes the proposal's
-% Sections 2-14 as they are, which include Step 8 (see open_items_and_deviations.md, WP D.1).
+% Chapter 05. Step 8 itself (trust weights, neutral imputation, one RL iteration with the referee) is
+% in chapter 03 and is not repeated here (O17, option (a), decided 27 Nov 2026). This chapter holds
+% decision D1: docs/thesis/notes/d1_scale_policy.md converted to LaTeX in D.2 without rewriting.
+% Its references to the proposal ("Eq. (20)", "P14 (b)", ...) are links to chapter 03, which prints
+% the proposal's numbers. The Markdown note stays in docs/thesis/notes/; change both together.
 \chapter{Trust weighting}\label{ch:trust}
 
-\section{Trust-weighted rewards (proposal Step 8)}
+The trust weights and the neutral imputation with the trust-weighted mean are Step~8 of the
+proposal, \cref{method:sec:trust}; they are not repeated here. This chapter holds decision D1 of the
+implementation plan: which standard deviation scales the trust-weighted advantages. The proposal's
+eq.~\eqref{method:eq:adv} uses the std of the trust-weighted returns (option A); option B, the std of
+the raw returns, is an extra ablation (data-free roadmap, §0.1).
 
-\section{Decision D1: which standard deviation scales the trust-weighted advantages}
+\section{D1: which std scales the trust-weighted advantages}\label{trust:sec:d1}
+
+Companion to \code{src/rlinf\_modified/algorithms/trust.py} and \code{tests/test\_trust\_weighting.py}
+(WP 1.2, 25 Nov 2026). Equation and proposition numbers refer to the proposal (27 Oct 2026).
+
+\subsection{Setup}
+
+Fix one group of $G$ candidates. Weights $w_{i,k}\in(0,1]$. Eq.~\eqref{method:eq:neutral}:
+\[
+m_k=\frac{\sum_i w_{i,k}r_{i,k}}{\sum_i w_{i,k}},\qquad \hat r_{i,k}=w_{i,k}r_{i,k}+(1-w_{i,k})\,m_k .
+\]
+Suffix returns $\hat R_{i,k}=\sum_{j\ge k}\gamma^{j-k}\hat r_{i,j}$ and raw returns $R_{i,k}$ (same
+with $r$). Centred returns $C_{i,k}=\hat R_{i,k}-\frac1G\sum_{i'}\hat R_{i',k}$. ``Std'' is the
+unbiased std (as in the code), so $\sum_i C_{i,k}^2=(G-1)\,\mathrm{Std}_i(\hat R_{i,k})^2$.
+
+\begin{itemize}
+\item \textbf{A} (eq.~\eqref{method:eq:adv}, default): $\hat A_{i,k}=C_{i,k}/(\hat s_k+\epsilon)$ with
+  $\hat s_k=\mathrm{Std}_i\hat R_{i,k}$.
+\item \textbf{B} (ablation): $\hat A_{i,k}=C_{i,k}/(s_k+\epsilon)$ with $s_k=\mathrm{Std}_i R_{i,k}$.
+\end{itemize}
+
+One identity is used throughout. By P\ref{method:prop:neutral}~(b), the group mean of
+$\hat r_{\cdot,k}$ is $m_k$, so
+\begin{equation*}
+\hat r_{i,k}-m_k=w_{i,k}\,(r_{i,k}-m_k).\tag{$*$}\label{trust:eq:star}
+\end{equation*}
+
+\subsection{Test 5: Lemma 1 holds after imputation, for A and B}
+
+Add $c_j$ to every reward of the group at chunk $j$. Then $m_j\to m_j+c_j$, so
+$\hat r_{i,j}\to w(r+c_j)+(1-w)(m_j+c_j)=\hat r_{i,j}+c_j$. Every imputed reward moves by the same
+$c_j$, as do the raw rewards. Every $\hat R_{i,k}$ and every $R_{i,k}$ then moves by the same
+$\sum_{j\ge k}\gamma^{j-k}c_j$. So $C$, $\hat s_k$ and $s_k$ are unchanged, and so are the advantages
+under A and under B.
+
+The shift may differ between groups, because everything is computed per group.
+\textbf{Condition:} the done boundaries must be shared within a group (fixed horizon). A member
+whose episode ended before chunk $j$ would not receive $c_j$. The test uses dones only at the end;
+whether production dones are always shared within a group is \chk.
+
+\subsection{Test 6, option A: the total is fixed at \texorpdfstring{$G-1$}{G-1}}
+
+$\sum_i \hat A_{i,k}^2=(G-1)\,\hat s_k^2/(\hat s_k+\epsilon)^2=(G-1)\,(1-O(\epsilon/\hat s_k))$,
+whatever the weights.
+
+Distrust therefore cannot change the total; it only redistributes it. By \eqref{trust:eq:star},
+distrusted members' centred rewards shrink toward 0, so the trusted members carry a larger share.
+If $G_T$ members are trusted and typical, each has $\hat A^2\approx (G-1)/G_T$ instead of
+$(G-1)/G$: a factor $\sqrt{G/G_T}$, which is 2 for 12 of 16 distrusted.
+
+\subsection{Test 6, option B: a fixed scale and a bound at the last chunk}
+
+\textbf{(i) The scale does not depend on the weights.} $s_k$ is computed from the raw returns, so
+$\hat A_{i,k}(s_k+\epsilon)=C_{i,k}$ exactly. The weights move the centre and the imputed values,
+never the scale.
+
+\textbf{(ii) At the last chunk, distrust never increases the total.} At $k=N-1$,
+$C_{i,k}=\hat r_{i,k}-m_k=w_{i,k}(r_{i,k}-m_k)$ by \eqref{trust:eq:star}. Write $\bar r_k$ for the
+plain mean. Then
+\[
+\sum_i C_{i,k}^2=\sum_i w_i^2(r_i-m)^2\ \le\ \sum_i w_i(r_i-m)^2\ \le\ \sum_i w_i(r_i-\bar r)^2\ \le\
+\sum_i (r_i-\bar r)^2=(G-1)s_k^2 .
+\]
+The first and last steps use $w\le1$. The middle step holds because $m$ minimises
+$\sum_i w_i(r_i-c)^2$ over $c$. Hence $\sum_i\hat A_{i,k}^2\le (G-1)s_k^2/(s_k+\epsilon)^2$, the
+value at full trust. The same holds at every chunk when $\gamma=0$.
+
+\textbf{(iii) At earlier chunks the bound fails.} $C_{i,k}=\sum_{j\ge k}\gamma^{j-k}w_{i,j}(r_{i,j}-m_j)$
+(from \eqref{trust:eq:star}, using $\sum_i(\hat r_{i,j}-m_j)=0$). Each chunk's vector shrinks, but
+cancellation across chunks in the raw returns can be undone.
+
+Example: $G=2$, $r_0=(1,-1)$, $r_1=(-1,1)$, $\gamma=0.95$, $w_1=0.05$ for both members.
+\begin{itemize}
+\item Raw: $C_0=\pm0.05$.
+\item Imputed: $C_0=\pm0.9525$.
+\item The total grows about 360 times ($|\hat A|$ goes from 0.71 to 13.5).
+\end{itemize}
+
+\subsection{What does not hold: per-member monotonicity}
+
+``The trusted members' advantages do not grow when others are distrusted'' is false under both
+policies. Example: $G=16$, rewards eight 0 and eight 10, seven of the zeros distrusted with
+$w=0.05$. The trusted zero-member's $|\hat A|$ is:
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+ & Full trust & B & A\\
+\midrule
+trusted zero-member $\lvert\hat A\rvert$ & 0.97 & 1.66 & 3.47\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Distrust moves $m_k$ toward the trusted majority, so away from a trusted minority member. B keeps
+the scale, but the centre still moves. The test
+\code{test\_d1\_counterexamples\_per\_member\_growth\_and\_earlier\_chunks} pins this example and the
+one in (iii).
+
+\subsection{Side result: exact neutrality of the advantages holds only under A}
+
+With $w_{i,k}=0$, $r_{i,k}$ drops out of $\hat r$ entirely (P\ref{method:prop:neutral}~(c)), so out
+of $C$ for both policies. Under A it then drops out of the advantages too. Under B it still enters
+through $s_k$, so changing it rescales the whole group. With $w_{\min}>0$ neither policy is exact.
+
+\subsection{Summary}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lYY@{}}
+\toprule
+ & A (eq.~\eqref{method:eq:adv}, default) & B (ablation)\\
+\midrule
+Scale & std of imputed returns, depends on $w$ & std of raw returns, independent of $w$\\
+$\sum_i \hat A^2$ per chunk & $= G-1$ always & $\le$ full-trust value at the last chunk; can grow earlier\\
+Effect of heavy distrust & same total update, concentrated on fewer members & smaller total update at the last chunk\\
+$w=0$ reward & no effect on the advantages & no effect on $C$; still sets the scale\\
+Per member & can grow (e.g.\ 3.6$\times$ above) & can grow (e.g.\ 1.7$\times$ above)\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Interpretation for the optimisation notes \chk:
+\begin{itemize}
+\item Under A, the FPO surrogate keeps its overall magnitude whatever the trust. With little trust,
+  the update is driven by a few members, so its variance rises.
+\item Under B, heavy distrust shrinks the last-chunk advantages, which is more conservative, at the
+  cost of a reward scale that still contains the distrusted rewards.
+\end{itemize}

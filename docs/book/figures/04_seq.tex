@@ -1,0 +1,24 @@
+% The figure "twin:fig:seq" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[scale=0.9,transform shape,>={Stealth[length=2mm]},
+  lane/.style={draw,fill=#1,minimum width=31mm,minimum height=9mm,font=\footnotesize\bfseries,align=center},
+  msg/.style={font=\scriptsize,align=center,anchor=south,inner sep=2pt},
+  note/.style={draw,rounded corners=2pt,fill=yellow!10,font=\scriptsize,align=center,inner sep=3pt}]
+\node[lane=orange!12] (P) at (0,0) {Policy (Cosmos)};
+\node[lane=blue!8] (E) at (3.6,0) {Env\\ \texttt{CtrlWorldEnv}};
+\node[lane=orange!8] (T) at (7.2,0) {Twin plugin +\\ \texttt{TwinSession}};
+\node[lane=gray!10] (W) at (10.8,0) {Env worker};
+\node[lane=green!8] (A) at (14.4,0) {Actor (FSDP)};
+\foreach \x in {0,3.6,7.2,10.8,14.4}{ \draw[gray,dashed] (\x,-0.5) -- (\x,-14.0); }
+\draw[->] (3.6,-1.5) -- node[msg]{1.\ \texttt{reset} (l.\,2050)\\ episode ids} (7.2,-1.5);
+\node[note] at (7.2,-2.4) {load \texttt{scene\_cache},\\ build $\Theta$};
+\draw[->] (0,-3.6) -- node[msg]{2.\ actions $(B,32,10)$} (3.6,-3.6);
+\draw[->] (3.6,-4.9) -- node[msg]{3.\ wrapped \texttt{chunk\_step}\\ (l.\,3155), after Ctrl-World} (7.2,-4.9);
+\node[note] at (7.2,-5.8) {T2 once; physics +\\ render for all $\vartheta$};
+\draw[->] (7.2,-7.7) -- node[msg]{4.\ chunk 0 probes:\\ \texttt{get\_state}, re-run,\\ \texttt{load\_state}} (3.6,-7.7);
+\draw[->] (3.6,-9.0) -- node[msg]{5.\ \texttt{infos}: \texttt{ctrl\_world\_video\_chunk*}\\ (env worker l.\,1263--1270)} (10.8,-9.0);
+\draw[->] (7.2,-10.3) -- node[msg]{6.\ features, verdicts,\\ weights $w_{i,k}$} (10.8,-10.3);
+\node[note] at (10.8,-11.2) {attach \texttt{trust\_weight}\\ next to rewards (l.\,1404)};
+\draw[->] (10.8,-12.5) -- node[msg]{7.\ rollout batch:\\ rewards + weights} (14.4,-12.5);
+\node[note,anchor=north] at (14.4,-12.8) {all-gather scalars\\ (l.\,1850, 1895); trust-\\weighted advantages\\ replace the call at\\ l.\,1917; then FPO};
+\end{tikzpicture}%

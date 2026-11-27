@@ -1,0 +1,46 @@
+% Appendix A. Source: the appendix "Notation" of import/thesis_proposal_final.tex, ported in D.2
+% without rewriting; its \section heading is a \chapter here (the book's appendix).
+\chapter{Notation}\label{method:app:notation}
+%=====================================================================
+\small
+\begin{longtable}{@{}p{3.0cm}p{12.6cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning}\\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Paper's loop}}\\
+$k$, $N=5$ & chunk index and number of chunks per rollout.\\
+$i$, $G=16$; $B$ & candidate in a group and group size; number of groups per iteration.\\
+$o_k$, $g$ & observation (three camera images) at chunk $k$; language instruction.\\
+$\Pi_\theta$, $\theta_a$ & world-action model (Cosmos); trained action-head parameters.\\
+$z$, $D$ & latent sample and decoder, $D(z)=(\VC,a)$.\\
+$\VC_{i,k}$, $a_{i,k}$ & imagined plan video; action chunk ($H_a=32$ steps at 15\,Hz, $d_a=10$).\\
+$W$, $h$, $\xi$, $T_a$ & Ctrl-World, its conditioning state, sampling noise, action conversion.\\
+$\VW_{i,k}$, $\mathrm{Ext}$ & predicted video; takes its last frame as next observation.\\
+$r_{i,k}$, $D_{\mathrm{pix}}$, $I^\star_g$ & reward, pixel MSE, goal image.\\
+$\gamma$, $R_{i,k}$, $\mu_k$, $s_k$, $\hat A_{i,k}$ & discount, return, group mean and standard deviation, advantage.\\
+$\rho$, $\epsilon_{\mathrm{clip}}$ & FPO ratio and clipping threshold (in Section~\ref{method:sec:budget}, $\rho$ is the probe fraction).\\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Twin and initialiser}}\\
+$q,\dot q$; $x\in\X$ & robot joints and velocities; object configuration, for the laptop $(p_x,p_y,\varphi,\vartheta)$.\\
+$\psi$, $p(\psi)$, $\Psi_K$ & uncertain physical parameters, their belief, $K$ samples.\\
+$F_\psi$, $T_S$, $\mathrm{Rend}_v$ & twin dynamics over one chunk, action conversion, renderer of camera $v$.\\
+$K_v$, $T_v$ & camera intrinsics and extrinsics.\\
+$\VS$ & twin video.\\
+$M^{\mathrm{obs}}_v$, $M_v(x;q)$ & SAM\,3 masks; rendered masks.\\
+$\mathcal L$, $\hat x$, $\hat\X_\nu$, $\nu$, $\mathcal L_{\max}$ & fitting loss, its minimiser, near-optimal set, tolerance, quality gate.\\
+$\Theta=\Psi_K\times\hat\X_\nu$, $\vartheta$ & uncertainty set of the twin and one element (physics and start state).\\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Comparison, verdicts and trust}}\\
+$\phi_t$, $\phi_{\mathrm{ref}}$, $c_t$ & V-JEPA feature of the window ending at $t$; of a still clip of the first frame; change since frame 0.\\
+$\Dt$, $Q^M$ & change-based distance; score of an action under a plan in model $M\in\{W,S\}$.\\
+$\tilde a$, $\varepsilon$, $B$, $c$; $a_\varnothing$ & probe, size, displacement basis, direction; null action.\\
+$\tau^W$, $\tau^S(\vartheta)$, $\tau^{\mathrm{real}}$ & effect of replacing $a$ by $\tilde a$ in Ctrl-World, twin, reality.\\
+$\eta_0$, $\eta$ & ``no effect'' and ``effect'' thresholds of the twin.\\
+$\sigma^W$, $s^W$, $s_0$ & pooled Ctrl-World noise scale, effect size, significance threshold.\\
+$d_{i,k}$, $S_{i,k}$, $\kappa_{i,k}$, $\kappa_{\max}$ & grounded disagreement, its minimum over $\Theta$, twin spread, abstention threshold.\\
+$m_k$ (Step 7), $q_\alpha$, $k^\ast_i$ & per-chunk scale, conformal threshold, divergence chunk.\\
+$p_{i,k}$, $g_{i,k}$, $w_{i,k}$, $w_{\min}$, $\alpha_w$ & probe term, grounded term, trust weight, floor, slope.\\
+$m_k$ (Step 8), $\hat r_{i,k}$ & trust-weighted group mean of rewards; trust-weighted reward.\\
+\bottomrule
+\end{longtable}
+\normalsize

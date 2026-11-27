@@ -1,8 +1,46 @@
 # Twin progress log
 
-Last updated: 26 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_implementation_plan.md`; work packages (WP) to `docs/thesis/data_free_roadmap.md`. Open items and deviations from the plan are collected in `docs/thesis/open_items_and_deviations.md`.
+Last updated: 27 Nov 2026. Branch `twin`. Milestones refer to `docs/thesis/twin_implementation_plan.md`; work packages (WP) to `docs/thesis/data_free_roadmap.md`. Open items and deviations from the plan are collected in `docs/thesis/open_items_and_deviations.md`.
 
 ## Done
+
+**WP D.2 (`wp_docs_system.md`): the notes ported into the book. Done (27 Nov).** Decisions taken before starting (you, 27 Nov): TinyTeX for a local compile; `twin_code_map.tex` stays out of the book; O17 option (a); chapter 03 holds the proposal's Sections 1-14, its Notation is Appendix A, its references close the book.
+
+| Item | Where | Result |
+|---|---|---|
+| Chapters 01-04 | `docs/book/chapters/01_paper_loop.tex` (from `awyi_optimisation.tex`), `02_rl_to_fpo.tex` (`fpo_from_zero.tex`), `03_method.tex` (`thesis_proposal_final.tex`), `04_twin.tex` (`twin_walkthrough.tex`) | Ported by a script that only cuts and moves text, and asserts that each cut finds its exact text once: body copied; title block and contents removed (subtitle, byline and date kept under the heading); labels prefixed per chapter (`loop:`, `fpo:`, `method:`, `twin:`; seven labels were reused across the notes); `\appendix` dropped inside chapters (the appendices are their last sections) |
+| Appendix A and references | `chapters/A_notation.tex`, `bibliography.tex`, `main.tex` | The proposal's Notation (`\section` became `\chapter`) and its 16 references. "The proposal in brief" box is at the start of chapter 03 |
+| Numbering | `preamble.tex`, `03_method.tex` | Chapter 03 prints the proposal's section, Step, equation and theorem numbers: 58 of its 60 labels print what the proposal printed (`.aux` compared); the two others are its figures (4.1, 4.2). Every equation label of the four notes keeps its number |
+| Preamble | `preamble.tex` | All macros, boxes and theorem styles of the five notes, one definition each. One rename: awyi's `\Lh` (`\hat L^{a}`, 19 uses) → `\Lha`. An `abstract` environment for chapters 01-02; `\sourcenote` |
+| Figures | `docs/book/figures/` (13 TikZ files, `README.md`) | One file per TikZ picture, named after its label. The four images: `scripts/make_book_figures.py` now writes to `docs/book/figures/` by default (from `__file__`; run from `docs/`, it wrote there) |
+| Chapter 05 | `05_trust_weighting.tex` | O17 (a): a paragraph linking to Step 8 (`\cref{method:sec:trust}`), then `notes/d1_scale_policy.md` in LaTeX. Its "Eq. (20)", "eq. (4)", "P14" are links that print those numbers. The Markdown note stays, with a line pointing to the chapter |
+| Chapter 06 | `06_decisions.tex` | The 15 decisions marked Approved in `open_items_and_deviations.md` (10 before D.2, 5 in D.2), with a pointer to that file for the rest |
+| Code map | deleted with `import/` | Not in the book (your decision). Each of its sections has a page in `docs/code/`; 265 of the 268 file and identifier names it mentions are there. The other three are its commit hash, a LaTeX artefact, and an abbreviated path that `files.md` writes out in full |
+| TeX and matplotlib | `/data/moro/tinytex` (not in the repo); `.venv` | TinyTeX v2026.11 (TeX Live 2026, pdfTeX 1.40.29, latexmk 4.88), packages added with `tlmgr` from CTAN (`tlmgr update --self` first). matplotlib 3.11.2 (as CI), dry run first: only new packages. `CLAUDE.md` has the `PATH` line |
+| Compile | `latexmk -pdf main.tex` | **82 pages, no error, no undefined reference or citation, no duplicate destination.** The D.1 title page made a duplicate `page.i` anchor; its page anchor is now off. `make -C docs/book` was not run (a scratch-copy run was declined); its grouped target needs GNU make ≥ 4.3 (here 4.3) (check) |
+| Tests (27 Nov) | `tests/test_docs.py` | Written first: **8 failed, 16 passed** on the D.1 skeleton (3 of the new tests hold trivially there). Now docs **24 passed**; twin subset **188 passed**; trust subset **46 passed**; `make_code_deps.py --check` up to date; `mkdocs build --strict` no warning |
+
+Remaining warnings of the book (all cosmetic; none is an error or an undefined reference):
+- 6 × hyperref "Token not allowed in a PDF string": chapter 02, two section titles with math. The same 6 are in `fpo_from_zero.pdf`.
+- 1 × hyperref "The anchor of a bookmark and its parent's must not be the same": chapter 03, the unnumbered "Overview" of Section 6. The same one is in the proposal.
+- 3 × "`h' float specifier changed to `ht'": figures placed `[h]` in the notes. The originals had 7.
+- Chapter 04: 1 overfull box (3.9 pt, a long `\code` name) and 5 underfull boxes. The same lines and the same values are in `twin_walkthrough.pdf`.
+- Chapter 01: 3 underfull boxes (badness 4967, 1478, 1325), new. Palatino replaces Latin Modern in chapters 01-02, so lines break differently.
+- Chapter 03: 1 underfull box (badness 1137), the M7 paragraph. In the proposal that line was 0.8 pt too wide; the book's `\emergencystretch` loosens it instead.
+- New warnings of my own (an overfull source note, two underfull lines in chapter 06's table) were fixed.
+
+Page-by-page check against the originals (each compiled once from a scratch copy; text by `pdftotext`, words of two or more letters, matched in order against the chapter, then against the book's unmatched words for moved floats; all 17 figures also compared by eye, side by side):
+
+| Original | Pages | Words | In order | Moved | Not found | What "not found" is |
+|---|---|---|---|---|---|---|
+| `awyi_optimisation` | 13 | 4015 | 3730 | 101 | 184 | the contents (pages 1-2, 140); math tokens that Palatino and Latin Modern extract differently (`la`, `laold`, `zbik`) |
+| `fpo_from_zero` | 24 | 7876 | 7432 | 117 | 327 | the contents (253); math tokens (`zj`, `ra`, `vs`); two pieces of figure text read in another order |
+| `thesis_proposal_final` | 21 | 8433 | 8187 | 8 | 238 | the contents (pages 1-3); the title (now the book's title page); "KTH Supervisor Sichao Liu" (left out on purpose); two math tokens |
+| `twin_walkthrough` | 17 | 5544 | 5030 | 316 | 198 | the contents (160); TikZ node labels that `pdftotext` reads in another order (the figures are identical by eye) |
+
+No sentence of body text is missing: every unmatched run outside the contents pages is math, figure text, or the title block. All 13 TikZ figures and the 4 images are present and identical apart from their numbers ("Figure 5.8" instead of "Figure 8") and the font.
+
+Sensitivity check (each break reverted; 10 breaks, all caught, each by its own test): a label defined twice (also caught by the references test); a reference without a label; a citation without a `\bibitem`; a figure file not input; a TikZ picture back in a chapter; the old `figs/` image path; a macro defined in a chapter; a skeleton heading left; Step 8 repeated in chapter 05; chapter 03 numbered with the chapter prefix. Restored: 24 passed.
 
 **WP D.1 (`wp_docs_system.md`): docs system skeleton, code docs, dependency-graph generator, CI. Done (26 Nov), except the first CI run, which needs your push and the GitHub setup (O15).**
 
@@ -283,7 +321,7 @@ Nothing half-done. Phase 1 (WP 1.1 to WP 1.5) and WP D.1 are closed; the WP 1.1 
 
 ## Exact next step
 
-**WP D.2 first** (`wp_docs_system.md`: "D.2 right after" D.1): port `docs/book/import/` into the chapters without rewriting, then delete the folder. Settle O17 (Step 8 in chapters 03 and 05) first. Resolve the macro clashes listed in `open_items_and_deviations.md` §2, WP D.1 (`\Lh`, `newc`, `blue`/`orange`). `make_book_figures.py` already exists; matplotlib is needed to run it locally (ask, O18). `twin_code_map.tex` is already ported into `docs/code/`, so it has no chapter.
+**Push `twin` and look at the first CI run** (O15, V18): the book is built there with another TeX Live image. Then **D.3** (`wp_docs_system.md`, Claude in chat): the editorial pass over the book, including chapter 00.
 
 Then, per the roadmap calendar (29 Nov - 3 Dec): **WP 4.1, then WP 4.2, then WP 2.2.**
 - **WP 4.1, Ctrl-World save/restore and probe re-run (M4):** `scripts/ctrl_world_restore_check.py` builds the env as the close config does, then:

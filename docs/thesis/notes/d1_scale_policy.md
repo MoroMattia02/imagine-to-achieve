@@ -2,6 +2,8 @@
 
 Companion to `src/rlinf_modified/algorithms/trust.py` and `tests/test_trust_weighting.py` (WP 1.2, 25 Nov 2026). Equation and proposition numbers refer to the proposal (27 Oct 2026).
 
+Also in the concept book, chapter 05 (`docs/book/chapters/05_trust_weighting.tex`, converted in WP D.2); change both together.
+
 ## Setup
 
 Fix one group of $G$ candidates. Weights $w_{i,k}\in(0,1]$. Eq. (20):

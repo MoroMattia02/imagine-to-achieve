@@ -1,9 +1,11 @@
 % Shared preamble of the concept book (WP D).
-% D.1: packages, colours, the box styles newc and keybox, and the \VC/\VW/\VS notation, taken
-% from the notes in docs/book/import/. D.2 moves the remaining macros of the notes here and
-% resolves name clashes (one notation; every renamed macro listed in its commit message).
-% Equation, step and proposition numbers in the code's docstrings refer to the proposal, not
-% to this book.
+% D.1: packages, colours, section styles, the boxes newc and keybox, the \VC/\VW/\VS notation.
+% D.2: the remaining macros, boxes and theorem styles of the five notes, one definition per name
+% (tests/test_docs.py checks that no name is defined twice or outside this file).
+% Renamed in D.2: \Lh of awyi_optimisation.tex (\hat L^{a}) is \Lha here; \Lh is the \hat L of
+% fpo_from_zero.tex. Every other macro kept its name and its definition.
+% Equation, step and proposition numbers in the code's docstrings refer to the proposal; chapter 03
+% (the proposal) prints the same numbers, see "Numbering" below.
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -22,10 +24,11 @@
 \usepackage[capitalise,noabbrev]{cleveref}
 
 \graphicspath{{figures/}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X} % awyi_optimisation.tex, fpo_from_zero.tex
 
 % Colours of twin_walkthrough.tex, thesis_proposal_final.tex and twin_code_map.tex. They redefine
 % xcolor's "blue" and "orange"; fpo_from_zero.tex and awyi_optimisation.tex used xcolor's own
-% colours, so the boxes of chapters 01-02 change shade (D.2: check).
+% colours, so their boxes and figures (chapters 01-02) are drawn in these shades instead.
 \definecolor{navy}{HTML}{14213D}
 \definecolor{blue}{HTML}{2E6F95}
 \definecolor{orange}{HTML}{C96A1B}
@@ -38,19 +41,107 @@
 \titleformat{\subsubsection}{\normalsize\bfseries\color{navy}}{\thesubsubsection}{0.5em}{}
 \titlespacing*{\section}{0pt}{14pt}{6pt}
 \titlespacing*{\subsection}{0pt}{10pt}{3pt}
+\titlespacing*{\subsubsection}{0pt}{8pt}{2pt} % the proposal's
 \setlist{itemsep=2pt,topsep=3pt,leftmargin=1.4em}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{5pt}
 \emergencystretch=3em
 
-% Boxes. keybox is identical in the three notes that define it. newc is as in the walkthrough and
-% the code map; fpo_from_zero.tex had slightly smaller padding (left/right 4pt, top/bottom 2pt).
+% Table of contents: the proposal widens the number box of subsections ("Step 9"); here also for
+% the three-level numbers of the other chapters.
+\makeatletter\renewcommand*\l@subsection{\@dottedtocline{2}{3.8em}{3.8em}}\makeatother
+
+% --- Numbering ---------------------------------------------------------------------------------
+% Each source numbered its equations and theorems from 1, without a section prefix, and the
+% code's docstrings cite the proposal's numbers (eq. (17), P12, Definition 1, M3, H2). So every
+% chapter counts them from 1 again, without the chapter prefix; chapter 03 also numbers its
+% sections as the proposal does. Figures and tables keep the book's "chapter.number".
+\renewcommand{\theequation}{\arabic{equation}}
+
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}[proposition]{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+\renewcommand{\theassumption}{M\arabic{assumption}}
+\newtheorem{hypothesis}{Hypothesis}
+\renewcommand{\thehypothesis}{H\arabic{hypothesis}}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\counterwithin*{proposition}{chapter}
+\counterwithin*{definition}{chapter}
+\counterwithin*{assumption}{chapter}
+\counterwithin*{hypothesis}{chapter}
+
+% --- Boxes -------------------------------------------------------------------------------------
+% keybox is identical in the three notes that define it. newc is as in the walkthrough and the
+% code map; fpo_from_zero.tex had slightly smaller padding (left/right 4pt, top/bottom 2pt).
 \newtcolorbox{newc}[1]{colback=green!4,colframe=green!40!black,fonttitle=\bfseries\small,
   title={New concept: #1},boxrule=0.5pt,arc=2pt,left=5pt,right=5pt,top=3pt,bottom=3pt}
 \newtcolorbox{keybox}[1][]{colback=blue!5,colframe=blue!60!black,boxrule=0.6pt,arc=2pt,
   left=7pt,right=7pt,top=5pt,bottom=5pt,#1}
+% awyi_optimisation.tex (intuition is identical in fpo_from_zero.tex)
+\newtcolorbox{codenote}[1][]{colback=gray!5,colframe=gray!55,fonttitle=\bfseries\small,
+  title={Code note #1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt,fontupper=\small}
+\newtcolorbox{intuition}[1][]{colback=blue!3,colframe=blue!40!black,fonttitle=\bfseries\small,
+  title={#1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt}
+\newtcolorbox{caveat}[1][]{colback=orange!5,colframe=orange!60!black,fonttitle=\bfseries\small,
+  title={#1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt}
+% fpo_from_zero.tex
+\newtcolorbox{paperlink}{colback=gray!5,colframe=gray!55,fonttitle=\bfseries\small,
+  title={In the paper},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt,fontupper=\small}
+% thesis_proposal_final.tex
+\newtcolorbox{why}{colback=gray!6,colframe=gray!55,boxrule=0.4pt,arc=2pt,left=7pt,right=7pt,top=4pt,bottom=4pt}
+\newtcolorbox{rqbox}[1][]{colback=orange!6,colframe=orange!80!black,boxrule=0.7pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,fonttitle=\bfseries,#1}
+% twin_walkthrough.tex
+\newtcolorbox{incode}[1][]{colback=gray!5,colframe=gray!55,fonttitle=\bfseries\small,
+  title={In the code#1},boxrule=0.5pt,arc=2pt,left=5pt,right=5pt,top=3pt,bottom=3pt,fontupper=\small}
+\newtcolorbox{inprop}{colback=orange!5,colframe=orange!70!black,fonttitle=\bfseries\small,
+  title={In the proposal},boxrule=0.5pt,arc=2pt,left=5pt,right=5pt,top=3pt,bottom=3pt,fontupper=\small}
 
+% The notes of chapters 01 and 02 open with an abstract. The book class has none; this one looks
+% like the article class's.
+\newenvironment{abstract}{\small\begin{center}\bfseries Abstract\end{center}\vspace{-0.5em}%
+  \begin{quotation}}{\end{quotation}}
+% The subtitle, byline and date of a ported note, under its chapter heading (D.2).
+\newcommand{\sourcenote}[1]{{\small\color{plangray}\raggedright#1\par}\medskip}
+\renewcommand{\bibname}{References} % the proposal's heading
+
+% --- Notation ----------------------------------------------------------------------------------
 % The three videos of one chunk (proposal, notation appendix).
 \newcommand{\VC}{V^{C}} % imagined plan video, decoded with the action chunk
 \newcommand{\VW}{V^{W}} % Ctrl-World's predicted video
 \newcommand{\VS}{V^{S}} % the twin's rendered video
+% Shared by several notes, with the same meaning everywhere.
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\X}{\mathcal X}            % proposal, walkthrough
+\newcommand{\Ah}{\hat A}               % awyi, fpo
+\newcommand{\clip}{\operatorname{clip}} % awyi, fpo
+% awyi_optimisation.tex
+\newcommand{\thv}{\theta_v^{0}}
+\newcommand{\tha}{\theta_a}
+\newcommand{\thao}{\theta_{a,\mathrm{old}}}
+\newcommand{\Lha}{\hat L^{a}}          % \Lh in awyi_optimisation.tex
+\newcommand{\eqp}[1]{\textup{(#1)}}    % paper equation number
+% fpo_from_zero.tex
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\Lc}{L_{\mathrm{CFM}}}
+\newcommand{\Lh}{\hat L}
+\newcommand{\Vf}{\mathcal{V}}
+\newcommand{\Qf}{\mathcal{Q}}
+% thesis_proposal_final.tex
+\newcommand{\Dt}{\tilde D}
+\DeclareMathOperator{\sign}{sign}
+\DeclareMathOperator{\Std}{Std}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\IoU}{IoU}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+% twin_walkthrough.tex (status tags; the code map's versions had no brackets)
+\newcommand{\done}{\textcolor{okgreen}{\textbf{[implemented]}}}
+\newcommand{\skel}{\textcolor{skelamber}{\textbf{[skeleton]}}}
+\newcommand{\planned}{\textcolor{plangray}{\textbf{[planned]}}}
+\newcommand{\chk}{\textit{(check)}}
+\newcommand{\code}[1]{{\small\ttfamily\begingroup\def\_{\textunderscore\allowbreak}\def\/{/\allowbreak}#1\endgroup}}

@@ -45,6 +45,8 @@ imagine-to-achieve/
 ├── docs/
 │   ├── code/                         these pages (MkDocs, mkdocs.yml at the root)
 │   ├── book/                         the concept book (LaTeX), built to book.pdf by CI
+│   │   ├── chapters/                 00-06 and A_notation; figures/ one TikZ file per figure
+│   │   └── main.tex, preamble.tex    preamble: every shared macro, defined once
 │   └── thesis/                       roadmap, progress log, open items, plan, guide, notes
 ├── mkdocs.yml
 ├── .github/workflows/docs.yml        builds the book and the site, deploys to GitHub Pages

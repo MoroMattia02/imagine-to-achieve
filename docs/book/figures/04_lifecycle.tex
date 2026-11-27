@@ -1,0 +1,25 @@
+% The figure "twin:fig:lifecycle" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[scale=0.84,transform shape,
+  stage/.style={draw,rounded corners=3pt,thick,align=left,font=\footnotesize,text width=38mm,minimum height=30mm,anchor=north,inner sep=4pt},
+  art/.style={draw,align=center,font=\scriptsize,fill=yellow!12,text width=38mm,inner sep=2pt,minimum height=6mm},
+  inp/.style={align=center,font=\scriptsize,text width=38mm,text=navy},
+  >={Stealth[length=2mm]}]
+\node[stage,fill=navy!6] (A) at (0,0) {\textbf{A. Once per task}\\[1pt] build the \emph{general twin}: robot model, laptop model, table, cameras.\\[2pt] \scriptsize Steps 1, 3; code: \code{robot.py}, \code{scene.py}, \code{cameras.py}};
+\node[stage,fill=blue!6] (B) at (4.6,0) {\textbf{B. Once per episode, offline}\\[1pt] fit the laptop's pose and lid angle to the episode's first frame; keep all near-optimal fits.\\[2pt] \scriptsize Step 2; code: \code{init\_fit.py}};
+\node[stage,fill=orange!8] (C) at (9.2,0) {\textbf{C. Once, before any RL}\\[1pt] replay real demos: fit the physics belief $p(\psi)$, controller, $T_{WB}$; phase map; thresholds.\\[2pt] \scriptsize Step 5; code: planned};
+\node[stage,fill=green!7] (D) at (13.8,0) {\textbf{D. Every chunk, in RL}\\[1pt] run the same actions in every plausible twin, render, compare with Ctrl-World, weight the reward.\\[2pt] \scriptsize Steps 3, 4, 6--8; code: \code{session.py}, plugin};
+\node[inp,above=2mm of A] {lab: dimensions, gripper, cameras;\\ repo: UR5 constants};
+\node[inp,above=2mm of B] {dataset: 40 first frames\\ (3 views, robot state); SAM 3};
+\node[inp,above=2mm of C] {dataset: 40 full demos\\ (videos, states, actions)};
+\node[inp,above=2mm of D] {policy actions; Ctrl-World\\ videos; V-JEPA 2};
+\node[art,below=3mm of A] (a1) {\texttt{ur5.xml} + scene MJCF\\(XML text, generated)};
+\node[art,below=1mm of a1] (a2) {camera parameters (JSON)};
+\node[art,below=3mm of B] (b1) {\texttt{scene\_cache/}\\ \texttt{episode\_XXX.json}:\\ best fit, near-optimal set, $q_0$};
+\node[art,below=3mm of C] (c1) {$p(\psi)$ samples, $T_{WB}$, lag (JSON)};
+\node[art,below=1mm of c1] (c2) {phase map, $\eta_0$, $s_0$, $q_\alpha$, $m_k$ (JSON)};
+\node[art,below=3mm of D] (d1) {per chunk: states, renders (in memory);\\ weights $w_{i,k}$ + logs (dump)};
+\draw[->,thick] (A.east) -- (B.west);
+\draw[->,thick] (B.east) -- (C.west);
+\draw[->,thick] (C.east) -- (D.west);
+\end{tikzpicture}%

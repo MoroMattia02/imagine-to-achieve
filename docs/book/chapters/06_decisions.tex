@@ -1,7 +1,65 @@
-% Chapter 06. Short: the decisions marked Approved in docs/thesis/open_items_and_deviations.md,
-% with a pointer to that file for the rest (D.2). Skeleton from WP D.1.
+% Chapter 06. Short: the decisions marked Approved in docs/thesis/open_items_and_deviations.md (§2,
+% and the resolved items of §1.4), with a pointer to that file for the rest (D.2). When a decision is
+% approved, add it here (definition of done, item 3 in CLAUDE.md).
 \chapter{Decisions}\label{ch:decisions}
+
+Every departure from the plan, with what the plan says, what was done instead, why, and whether it
+was approved, is tracked in \code{docs/thesis/open\_items\_and\_deviations.md}. ``The plan'' means,
+in order of precedence, the proposal (\cref{ch:proposal}), the data-free roadmap, the implementation
+plan and the detailed guide. This chapter lists only the decisions marked \emph{Approved} there,
+as of 27 November 2026.
 
 \section{Approved decisions}
 
+{\small
+\begin{longtable}{@{}p{2.3cm}>{\raggedright\arraybackslash}p{10.6cm}p{2.6cm}@{}}
+\toprule
+\textbf{Where} & \textbf{Decision} & \textbf{Approved}\\
+\midrule
+\endhead
+T1 & Robot model: the original UR5, generated from the DH constants in
+\code{eef\_pose\_adapter.py}, not the UR5e of MuJoCo Menagerie. Those constants produced
+Ctrl-World's conditioning states; the proposal allows adapting to the older UR5. &
+roadmap §0.1\\
+T2 & Resampling 15 to 30\,Hz: rotation by quaternion slerp, through the repo function
+\code{resample\_eef\_state\_sequence\_by\_fps} called as is, not linear in the axis-angle channels. &
+repo behaviour\\
+T2 & The action conversion runs in float32, as production does, which gives bit-exact parity. &
+repo behaviour\\
+T2 & Camera roles: main = \code{d405\_0\_rgb}, wrist = \code{d435\_rgb}, side = \code{d405\_1\_rgb}
+(\code{camera\_layout.py}), not as in the implementation plan and the guide. & 17 Nov\\
+WP 1.2 & Roadmap acceptance 6 for D1-B is replaced by its provable version: B's scale does not
+depend on the weights, and at the last chunk $\sum_i\hat A_{\mathrm B}^2$ never exceeds its
+full-trust value; the counterexample to the original claim is pinned in a test
+(\cref{trust:sec:d1}). & 25 Nov\\
+WP 1.4 & The no-verdict probe weight has a floor:
+$p=\max\bigl(w_{\min},\sigma(\alpha_w(\log s_W-\log s_0))\bigr)$. It equals
+eq.~(19) wherever $\sigma(\cdot)\ge w_{\min}$. & 26 Nov\\
+WP 1.4 & One $s_W$ per candidate (a scalar argument); the rule for $J$ probes is left to WP 2.2. &
+26 Nov\\
+WP 1.5 & $w=p\cdot g$ is not clipped, as in eq.~(18): $w\in[w_{\min}^2,1]$. &
+26 Nov\\
+WP 1.5 & The soft grounded term (Step 8.1 ablation) is
+$g_k=w_{\min}+(1-w_{\min})\,\sigma\bigl((q_\alpha-R_k)/\mathrm{scale}\bigr)$, with $R_k$ the running
+maximum of $S_j/m_j$ over the non-abstaining chunks $j\le k$. & 26 Nov\\
+WP D.1 & Zoomable diagrams in the code docs (buttons, wheel, drag, full screen). & 26 Nov\\
+WP D.2 & Step 8 appears once, in \cref{ch:proposal}; \cref{ch:trust} links to it and holds only the
+D1 note (O17, option (a)). & 27 Nov\\
+WP D.2 & \Cref{ch:proposal} holds the proposal's Sections 1--14 with ``The proposal in brief'',
+numbered as in the proposal; its Notation is \cref{method:app:notation}, its references close the
+book. & 27 Nov\\
+WP D.2 & \code{twin\_code\_map.tex} is not in the book: the code docs (\code{docs/code/}) are its
+maintained version. & 27 Nov\\
+WP D.2 & \code{scripts/make\_book\_figures.py} writes the four images of \cref{ch:rl-to-fpo} into
+\code{docs/book/figures/} by default. & 27 Nov\\
+WP D.2 & The book is compiled locally with TinyTeX (TeX Live in user space); CI uses its own TeX
+Live image. & 27 Nov\\
+\bottomrule
+\end{longtable}}
+
 \section{Everything else}
+
+The open items (what needs a decision, a lab answer or a later check), the choices marked
+\emph{Review} (made during a work package and not yet confirmed) and the errors found in the plan
+documents are only in \code{docs/thesis/open\_items\_and\_deviations.md}. The running log of what is
+done, with test results, is \code{docs/thesis/progress.md}.

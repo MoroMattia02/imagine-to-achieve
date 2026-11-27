@@ -1,4 +1,4 @@
-"""WP D.1: drift tests for the code docs (docs/code/) and the book skeleton (docs/book/).
+"""WP D.1 and D.2: drift tests for the code docs (docs/code/) and the concept book (docs/book/).
 
 Acceptance (wp_docs_system.md, D.1 task 4); standard library only, fast:
 - the generated block of ``docs/code/deps.md`` equals a fresh run of ``scripts/make_code_deps.py``;
@@ -7,8 +7,12 @@ Acceptance (wp_docs_system.md, D.1 task 4); standard library only, fast:
 - every relative link in ``docs/code/**/*.md`` points to an existing file inside ``docs/code/``.
 
 Also checked here: the generator itself on a small synthetic package (eager, lazy and by-path
-imports, determinism), and that ``docs/book/main.tex`` includes the seven chapter files, since
-TeX is not installed on every machine that runs the tests.
+imports, determinism). For the book (D.2), at the source level, because TeX is not installed on
+every machine that runs the tests: ``main.tex`` includes the seven chapters and the appendix;
+``import/`` is gone; no skeleton heading is left; labels are unique and every reference and
+citation resolves; each TikZ picture is its own file in ``figures/``; the images are those of
+``scripts/make_book_figures.py``; macros are defined once, in the preamble; chapter 05 links to
+Step 8 instead of repeating it (O17); chapter 03 keeps the proposal's numbering.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ BOOK_CHAPTERS = (
     "05_trust_weighting",
     "06_decisions",
 )
+BOOK_APPENDICES = ("A_notation",)
 
 
 def _documented_modules() -> list[str]:
@@ -294,17 +299,165 @@ def test_link_checker_sees_inline_and_reference_links():
     assert sorted(found) == ["deps.md", "files.md#y", "img.png"]
 
 
-# --- the book skeleton -------------------------------------------------------------------------
+# --- the book ----------------------------------------------------------------------------------
+
+_TEX_COMMENT = re.compile(r"(?<!\\)%.*")
+_TEX_LABEL = re.compile(r"\\label\{([^}]+)\}")
+_TEX_REF = re.compile(r"\\(?:[cC]ref|ref|eqref|pageref|autoref|nameref|[cC]pageref|labelcref)\*?\{([^}]*)\}")
+_TEX_REF_RANGE = re.compile(r"\\(?:[cC]refrange|[cC]pagerefrange)\*?\{([^}]*)\}\{([^}]*)\}")
+_TEX_CITE = re.compile(r"\\cite[pt]?\*?(?:\[[^\]]*\])?\{([^}]+)\}")
+_TEX_BIBITEM = re.compile(r"\\bibitem(?:\[[^\]]*\])?\{([^}]+)\}")
+_TEX_DEFINITION = re.compile(
+    r"\\(?:newcommand|providecommand|DeclareMathOperator|newtcolorbox|newtheorem|newenvironment"
+    r"|newcolumntype|definecolor)\*?\{?(\\?[A-Za-z@]+)\}?"
+)
 
 
-def test_book_main_includes_the_seven_chapters():
-    main = (BOOK / "main.tex").read_text(encoding="utf-8")
-    main = re.sub(r"(?<!\\)%.*", "", main)  # drop comments
+def _tex(path: Path) -> str:
+    """A book source without its comments."""
+    return _TEX_COMMENT.sub("", path.read_text(encoding="utf-8"))
+
+
+def _book_sources() -> dict[str, str]:
+    """Every ``.tex`` file of the book, by path relative to ``docs/book`` (``import/`` left out)."""
+    return {
+        p.relative_to(BOOK).as_posix(): _tex(p)
+        for p in sorted(BOOK.rglob("*.tex"))
+        if "import" not in p.relative_to(BOOK).parts
+    }
+
+
+def test_book_main_includes_the_chapters_then_the_appendix():
+    main = _tex(BOOK / "main.tex")
     included = tuple(re.findall(r"\\include\{chapters/([^}]+)\}", main))
-    assert included == BOOK_CHAPTERS
-    for name in BOOK_CHAPTERS:
-        chapter = (BOOK / "chapters" / f"{name}.tex").read_text(encoding="utf-8")
+    assert included == BOOK_CHAPTERS + BOOK_APPENDICES
+    last_chapter = main.index(f"\\include{{chapters/{BOOK_CHAPTERS[-1]}}}")
+    first_appendix = main.index(f"\\include{{chapters/{BOOK_APPENDICES[0]}}}")
+    assert last_chapter < main.find("\\appendix") < first_appendix, "\\appendix must separate them"
+    for name in included:
+        chapter = _tex(BOOK / "chapters" / f"{name}.tex")
         assert re.search(r"^\\chapter\{.+\}", chapter, re.M), f"{name}.tex has no \\chapter heading"
     for target in re.findall(r"\\input\{([^}]+)\}", main):
         path = BOOK / (target if target.endswith(".tex") else f"{target}.tex")
         assert path.is_file(), f"main.tex inputs a missing file {target}"
+
+
+def test_book_import_folder_is_gone():
+    """D.2 ports ``docs/book/import/`` into the chapters and deletes it in the same commit."""
+    assert not (BOOK / "import").exists()
+
+
+def test_book_sections_have_bodies():
+    """No skeleton heading is left in chapters 01-06 and the appendix (chapter 00 waits for D.3)."""
+    empty = []
+    for name in BOOK_CHAPTERS[1:] + BOOK_APPENDICES:
+        text = _tex(BOOK / "chapters" / f"{name}.tex")
+        heads = list(re.finditer(r"^\\section\*?\{.*$", text, re.M))
+        for head, nxt in zip(heads, heads[1:] + [None]):
+            body = _TEX_LABEL.sub("", text[head.end() : nxt.start() if nxt else len(text)])
+            if not body.strip():
+                empty.append(f"{name}: {head.group(0)}")
+    assert not empty, f"sections without a body: {empty}"
+
+
+def test_book_labels_are_unique():
+    """The five sources reused labels (``sec:init``, ``eq:adv``, ...); the book prefixes them."""
+    first: dict[str, str] = {}
+    clashes = []
+    for name, text in _book_sources().items():
+        for label in _TEX_LABEL.findall(text):
+            if label in first:
+                clashes.append(f"{label} ({first[label]}, {name})")
+            first.setdefault(label, name)
+    assert not clashes, f"labels defined twice: {clashes}"
+
+
+def test_book_references_resolve():
+    sources = _book_sources()
+    labels = {label for text in sources.values() for label in _TEX_LABEL.findall(text)}
+    missing = []
+    for name, text in sources.items():
+        keys = [key for group in _TEX_REF.findall(text) for key in group.split(",")]
+        keys += [key for pair in _TEX_REF_RANGE.findall(text) for key in pair]
+        missing += [f"{name}: {key.strip()}" for key in keys if key.strip() not in labels]
+    assert not missing, f"references without a label: {missing}"
+
+
+def test_book_citations_resolve():
+    sources = _book_sources()
+    items = {key for text in sources.values() for key in _TEX_BIBITEM.findall(text)}
+    cited = {
+        key.strip()
+        for text in sources.values()
+        for group in _TEX_CITE.findall(text)
+        for key in group.split(",")
+    }
+    assert cited, "the proposal's citations were not ported"
+    assert cited <= items, f"cited without a \\bibitem: {sorted(cited - items)}"
+
+
+def test_book_figure_files_are_used_once():
+    """D.2 task 2: each TikZ picture is ``figures/<chapter>_<name>.tex``, input by one chapter."""
+    sources = _book_sources()
+    chapters = {name: text for name, text in sources.items() if name.startswith("chapters/")}
+    inputs = sorted(t for text in chapters.values() for t in re.findall(r"\\input\{figures/([^}]+)\}", text))
+    files = sorted(p.stem for p in (BOOK / "figures").glob("*.tex"))
+    assert files, "no figure files"
+    assert inputs == files, "every figure file must be input exactly once, and exist"
+    prefixes = tuple(f"{name.split('_')[0]}_" for name in BOOK_CHAPTERS + BOOK_APPENDICES)
+    for stem in files:
+        assert stem.startswith(prefixes), f"figures/{stem}.tex does not start with a chapter number"
+        assert sources[f"figures/{stem}.tex"].count("\\begin{tikzpicture}") == 1, stem
+    for name, text in chapters.items():
+        assert "\\begin{tikzpicture}" not in text, f"{name} still holds a TikZ picture"
+
+
+def test_book_images_are_the_generated_ones():
+    """D.2 task 3: the chapters include exactly the images that make_book_figures.py writes."""
+    script = (ROOT / "scripts" / "make_book_figures.py").read_text(encoding="utf-8")
+    written = sorted(re.findall(r'out\s*/\s*"([^"]+)"', script))
+    used = sorted(
+        target
+        for text in _book_sources().values()
+        for target in re.findall(r"\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}", text)
+    )
+    assert written == ["densities.pdf", "field2d.pdf", "paths.pdf", "slopefield.pdf"]
+    assert used == written
+
+
+def test_book_macros_are_defined_once_in_the_preamble():
+    """D.2 task 1: shared macros live in ``preamble.tex``, with one definition per name."""
+    definitions = [
+        (name, macro) for name, text in _book_sources().items() for macro in _TEX_DEFINITION.findall(text)
+    ]
+    outside = [f"{name}: {macro}" for name, macro in definitions if name != "preamble.tex"]
+    assert not outside, f"defined outside the preamble: {outside}"
+    names = [macro for _, macro in definitions]
+    assert not sorted({m for m in names if names.count(m) > 1}), "a name is defined twice"
+
+
+def test_trust_chapter_points_to_step_8_instead_of_repeating_it():
+    """O17, option (a): chapter 05 links to Step 8 in chapter 03 and holds only the D1 note."""
+    method = _tex(BOOK / "chapters" / "03_method.tex")
+    trust = _tex(BOOK / "chapters" / "05_trust_weighting.tex")
+    assert "\\label{method:sec:trust}" in method
+    assert re.search(r"\\[cC]ref\{method:sec:trust\}", trust)
+    heading = "Neutral imputation with the trust-weighted mean"
+    assert heading in method and heading not in trust
+
+
+def test_method_chapter_keeps_the_proposal_numbers():
+    """Docstrings cite the proposal's Section, Step, equation and proposition numbers.
+
+    Chapter 03 prints the same ones: sections without the chapter prefix (the proposal's Method
+    section numbers its subsections "Step k" itself), and equations and theorems counted per
+    chapter without a prefix, as in each source document.
+    """
+    preamble = _tex(BOOK / "preamble.tex")
+    method = _tex(BOOK / "chapters" / "03_method.tex")
+    assert "\\renewcommand{\\theequation}{\\arabic{equation}}" in preamble
+    for counter in ("proposition", "definition", "assumption", "hypothesis"):
+        assert f"\\counterwithin*{{{counter}}}{{chapter}}" in preamble, counter
+    assert "\\renewcommand{\\thesection}{\\arabic{section}}" in method
+    assert "\\renewcommand{\\thesubsection}{Step~\\arabic{subsection}}" in method
+    assert method.rstrip().endswith("\\renewcommand{\\thesection}{\\thechapter.\\arabic{section}}")

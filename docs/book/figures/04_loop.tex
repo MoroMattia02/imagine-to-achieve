@@ -1,0 +1,25 @@
+% The figure "twin:fig:loop" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[scale=0.84,transform shape,
+  box/.style={draw,rounded corners=2pt,align=center,font=\footnotesize,minimum height=11mm,inner sep=3pt,text width=#1},
+  box/.default=25mm, >={Stealth[length=2mm]}]
+\node[box=24mm,fill=navy!8] (o0) at (0,0) {real first frame $o_0$\\ \scriptsize dataset, 3 cameras};
+\node[box=25mm,fill=orange!12] (pol) at (3.6,0) {\textbf{Policy} (Cosmos)\\ plan $\VC$, actions $a$\\ \scriptsize $a\in\R^{32\times10}$};
+\node[box=27mm,fill=blue!8] (wm) at (7.7,1.35) {\textbf{Ctrl-World}\\ predicted video $\VW$};
+\node[box=27mm,fill=orange!8,very thick] (tw) at (7.7,-1.35) {\textbf{Twin} (MuJoCo)\\ rendered video $\VS$\\ \scriptsize \code{src/twin/}};
+\node[box=24mm,fill=yellow!14] (rew) at (11.6,1.35) {\textbf{reward} $r$\\ $\VC$ vs $\VW$};
+\node[box=24mm,fill=red!7] (cmp) at (11.6,-1.35) {\textbf{compare}\\ \scriptsize change since frame 0\\ $\Rightarrow$ verdict, weight $w$};
+\node[box=22mm,fill=green!8] (tr) at (15.0,0) {\textbf{trust-weighted}\\ reward $\hat r$\\ $\to$ FPO};
+\node[box=24mm,fill=navy!5] (ini) at (3.6,-2.9) {\textbf{initialiser}\\ \scriptsize SAM 3 + fit, offline};
+\draw[->] (o0) -- (pol);
+\draw[->] (pol.east) -- ++(3mm,0) |- (wm.west) node[pos=0.8,above,font=\scriptsize]{$a$};
+\draw[->] (pol.east) -- ++(3mm,0) |- (tw.west) node[pos=0.8,above,font=\scriptsize]{same $a$};
+\draw[->] (o0.south) |- (ini.west);
+\draw[->] (ini.east) -| ([xshift=-7mm]tw.south) node[pos=0.25,below,font=\scriptsize]{scene state $x_0$};
+\draw[->] (wm) -- (rew);
+\draw[->] (wm.south east) -- (cmp.north west);
+\draw[->] (tw) -- (cmp);
+\draw[->] (rew.east) -- ++(2mm,0) |- ([yshift=2mm]tr.west);
+\draw[->] (cmp.east) -- ++(2mm,0) |- ([yshift=-2mm]tr.west);
+\draw[->,dashed] (wm.north) -- ++(0,5mm) -| node[pos=0.25,above,font=\scriptsize]{next observation from $\VW$ (the paper's loop, unchanged)} (pol.north);
+\end{tikzpicture}%

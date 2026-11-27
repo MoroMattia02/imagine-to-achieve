@@ -1,0 +1,15 @@
+% The figure "twin:fig:frames" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[fr/.style={draw,circle,minimum size=9mm,font=\footnotesize,fill=blue!6},>={Stealth[length=2mm]}]
+\node[fr] (W) at (0,0) {$W$};
+\node[fr] (B) at (3.2,0) {$B$};
+\node[fr] (E) at (6.4,0) {$E$};
+\node[fr] (Cw) at (9.6,0) {$C_{\text{wrist}}$};
+\node[fr] (Cf) at (3.2,-2.0) {$C_{v}$};
+\node[fr] (L) at (-0.2,-2.0) {$L$};
+\draw[->] (W) -- node[above,font=\scriptsize]{$T_{WB}$} node[below,font=\scriptsize]{unknown} (B);
+\draw[->] (B) -- node[above,font=\scriptsize]{$T_{BE}(q)$} node[below,font=\scriptsize]{FK} (E);
+\draw[->] (E) -- node[above,font=\scriptsize]{$T_{EC}$} node[below,font=\scriptsize]{mount} (Cw);
+\draw[->] (W) -- node[left,font=\scriptsize,pos=0.6]{$T_{WC_v}$} (Cf);
+\draw[->] (W) -- node[left,font=\scriptsize]{$x_0$} (L);
+\end{tikzpicture}%

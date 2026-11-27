@@ -1,11 +1,15 @@
-"""Regenerate the four figures of fpo_from_zero.tex from the formulas in its flow-model section.
+"""Regenerate the four images of book chapter 02 (from fpo_from_zero.tex) from its flow-model formulas.
 
 field2d.pdf     vector field v(z) = (2 - z1, 1 - z2) with four trajectories
 densities.pdf   p_tau(z) = 1/2 N(z; 2 tau, (1-tau)^2) + 1/2 N(z; -2 tau, (1-tau)^2) at four times
 paths.pdf       left: straight training lines z_tau = tau x + (1-tau) eps; right: trajectories of v*
 slopefield.pdf  slope field of v*(z, tau) = (2 tanh(2 tau z / (1-tau)^2) - z) / (1 - tau)
 
-Usage: python make_fpo_figures.py [output_dir]   (default: figs/)
+Usage: python scripts/make_book_figures.py [output_dir]
+
+The default output_dir is the book's figures folder, docs/book/figures/, where the chapter's
+\includegraphics finds them (\graphicspath in preamble.tex), whatever the working directory.
+The PDFs are not committed (*.pdf is gitignored); CI and `make -C docs/book` run this first.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ BLUE = "#2E6F95"
 ORANGE = "#C96A1B"
 GREY = "#6B7280"
 plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.right": False})
+BOOK_FIGURES = Path(__file__).resolve().parents[1] / "docs" / "book" / "figures"
 
 
 def v_star(z: np.ndarray, tau: float) -> np.ndarray:
@@ -125,7 +130,7 @@ def slopefield(path: Path) -> None:
 
 
 def main() -> None:
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("figs")
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else BOOK_FIGURES
     out.mkdir(parents=True, exist_ok=True)
     field2d(out / "field2d.pdf")
     densities(out / "densities.pdf")

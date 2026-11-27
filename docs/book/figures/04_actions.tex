@@ -1,0 +1,20 @@
+% The figure "twin:fig:actions" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[>={Stealth[length=2mm]},
+  st/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,minimum height=10mm,text width=24mm,inner sep=2pt}]
+\node[st,fill=orange!10] (a) at (0,0) {action chunk\\ $(32,10)$, 15\,Hz};
+\node[st,fill=gray!8] (c) at (3.0,0) {\code{check\_actions}\\ hard errors /\\ warnings};
+\node[st,fill=blue!8] (r) at (6.0,0) {repo chain\\ $T_{i+1}=T_i\Delta T$\\ 32 states};
+\node[st,fill=blue!8] (g) at (9.0,0) {gripper clip\\ $[q_{01},q_{99}]$};
+\node[st,fill=blue!8] (s) at (12.0,0) {resample\\ 15$\to$30\,Hz (slerp)\\ 64 states $(64,7)$};
+\draw[->] (a)--(c); \draw[->] (c)--(r); \draw[->] (r)--(g); \draw[->] (g)--(s);
+% time grid
+\begin{scope}[yshift=-1.9cm]
+\draw[->] (0,0) -- (13.4,0) node[right,font=\scriptsize]{$t$};
+\foreach \i in {0,...,16}{ \draw (0.4+\i*0.75,0) -- ++(0,0.18); }
+\foreach \i in {0,...,32}{ \draw[orange] (0.4+\i*0.375,0) -- ++(0,-0.14); }
+\node[font=\scriptsize,anchor=west] at (0.2,0.42) {policy steps at 15\,Hz (first 16 of 32 drawn)};
+\node[font=\scriptsize,anchor=west,text=orange] at (0.2,-0.42) {Ctrl-World / twin targets at 30\,Hz};
+\node[font=\scriptsize,align=left,anchor=west] at (7.4,0.48) {chunk = 32 actions $\approx$ 2.13\,s};
+\end{scope}
+\end{tikzpicture}%

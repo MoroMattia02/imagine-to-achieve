@@ -1,0 +1,13 @@
+% The figure "twin:fig:init" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[>={Stealth[length=2mm]},
+  st/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,minimum height=11mm,text width=23mm,inner sep=2pt}]
+\node[st,fill=navy!8] (f) at (0,0) {first frame,\\ 3 views + $q_0$};
+\node[st,fill=blue!8] (m) at (3.0,0) {SAM 3\\ ``laptop'', ``laptop screen''\\ $\Rightarrow$ masks $M^{\text{obs}}_v$};
+\node[st,fill=orange!10] (r) at (6.0,0) {render twin masks\\ $M_v(x;q_0)$\\ robot pixels removed};
+\node[st,fill=orange!10] (l) at (9.0,0) {loss $\mathcal L(x)$\\ $\sum_v(1-\mathrm{IoU})$\\ + penetration};
+\node[st,fill=green!8] (s) at (12.0,0) {grid, refine,\\ near-optimal set $\hat\X_\nu$,\\ rest check};
+\node[draw,fill=yellow!12,font=\scriptsize,align=center,text width=40mm] (j) at (12.0,-1.7) {\code{scene\_cache\/episode\_XXX.json}};
+\draw[->] (f)--(m); \draw[->] (m)--(r); \draw[->] (r)--(l); \draw[->] (l)--(s); \draw[->] (s)--(j);
+\draw[->,dashed] (s.north) -- ++(0,0.5) -| node[pos=0.25,above,font=\scriptsize]{try another $x$} (r.north);
+\end{tikzpicture}%

@@ -2,12 +2,17 @@
 % propositions and diagrams. The code is documented separately (docs/code/, MkDocs).
 % Build: make (latexmk -pdf main.tex); CI builds it with .github/workflows/docs.yml and publishes
 % book.pdf next to the code docs. PDFs are never committed.
+% Contents (D.2): chapters 01-04 are the four notes of docs/book/import/ (deleted after the port),
+% chapter 05 the D1 note, chapter 06 the approved decisions; Appendix A and the references come
+% from the proposal. Chapter 00 is written in D.3.
 \documentclass[11pt,a4paper,oneside]{book}
 \input{preamble}
 
 \begin{document}
 
 \frontmatter
+% No page anchor on the title page: it and the contents would both be page "i" in the PDF.
+\hypersetup{pageanchor=false}
 \begin{titlepage}
   \centering
   \vspace*{4cm}
@@ -17,9 +22,10 @@
   \vspace{1.5cm}
   {\normalsize Master thesis, repository \texttt{imagine-to-achieve}\par}
   \vfill
-  {\small Built from \texttt{docs/book/} by CI. Step, equation and proposition numbers in the
-  code's docstrings refer to the thesis proposal, not to this book.\par}
+  {\small Built from \texttt{docs/book/} by CI. Section, Step, equation and proposition numbers
+  in the code's docstrings refer to the thesis proposal; its chapter here prints the same numbers.\par}
 \end{titlepage}
+\hypersetup{pageanchor=true}
 \tableofcontents
 
 \mainmatter
@@ -30,5 +36,11 @@
 \include{chapters/04_twin}
 \include{chapters/05_trust_weighting}
 \include{chapters/06_decisions}
+
+\appendix
+\include{chapters/A_notation}
+
+\backmatter
+\input{bibliography}
 
 \end{document}

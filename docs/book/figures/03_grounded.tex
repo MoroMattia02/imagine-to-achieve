@@ -1,0 +1,21 @@
+% The figure "method:fig:grounded" of import/thesis_proposal_final.tex, moved here unchanged in D.2;
+% \input by chapters/03_method.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[
+  ch/.style={draw,rounded corners=2pt,minimum width=17mm,minimum height=7mm,font=\footnotesize},
+  >={Stealth[length=2mm]}]
+\node[draw,rounded corners=2pt,fill=navy!10,align=center,font=\footnotesize,minimum height=20mm,text width=19mm] (s) at (0,0) {same real\\ first frame};
+\node[font=\footnotesize\bfseries,color=blue] at (2.15,1.0) {Ctrl-World};
+\node[font=\footnotesize\bfseries,color=orange] at (2.15,-1.0) {Twin};
+\foreach \k in {1,...,5}{
+  \node[ch,draw=blue] (w\k) at (2.0+1.95*\k,0.6) {chunk \k};
+  \node[ch,draw=orange] (t\k) at (2.0+1.95*\k,-0.6) {chunk \k};
+}
+\draw[->] (s.east) -- ++(1.6,0.6) -- (w1.west);
+\draw[->] (s.east) -- ++(1.6,-0.6) -- (t1.west);
+\foreach \a/\b in {1/2,2/3,3/4,4/5}{\draw[->] (w\a) -- (w\b); \draw[->] (t\a) -- (t\b);}
+\node[font=\scriptsize,align=center] at (w1|-0,-1.5) {consistent};
+\node[font=\scriptsize,align=center] at (w2|-0,-1.5) {consistent};
+\node[font=\scriptsize,align=center,color=orange] at (w3|-0,-1.5) {\textbf{divergence}};
+\node[font=\scriptsize,align=center,color=orange] at (w4|-0,-1.5) {distrusted};
+\node[font=\scriptsize,align=center,color=orange] at (w5|-0,-1.5) {distrusted};
+\end{tikzpicture}%

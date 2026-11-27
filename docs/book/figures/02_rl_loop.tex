@@ -1,0 +1,8 @@
+% The figure (no label) of import/fpo_from_zero.tex, moved here unchanged in D.2;
+% \input by chapters/02_rl_to_fpo.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[>={Stealth[length=2mm]},box/.style={draw,rounded corners=2pt,minimum width=2.8cm,minimum height=1cm,align=center,font=\small}]
+\node[box,fill=blue!8] (ag) at (0,0) {\textbf{Agent}\\ policy $\pi_\theta$};
+\node[box,fill=orange!10] (env) at (7,0) {\textbf{Environment}\\ dynamics $p(s'\mid s,a)$};
+\draw[->,thick] (ag.north) to[bend left=25] node[above,font=\small] {action $a_k$} (env.north);
+\draw[->,thick] (env.south) to[bend left=25] node[below,font=\small,align=center] {next state $s_{k+1}$, reward $r_k$} (ag.south);
+\end{tikzpicture}%

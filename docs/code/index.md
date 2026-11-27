@@ -45,8 +45,11 @@ Only the three packages of the `docs` extra are needed to build the site: the AP
 from the source by griffe, which does not import the code, so neither torch nor MuJoCo has to be
 installed. `book.pdf` exists only on the deployed site; locally the link above is dead.
 
-The book: `python scripts/make_book_figures.py docs/book/figures` (needs numpy and matplotlib),
-then `make -C docs/book` (needs `latexmk` and a TeX distribution). CI does both.
+The book: `make -C docs/book` (needs `latexmk` and a TeX distribution; it first runs
+`scripts/make_book_figures.py`, which needs numpy and matplotlib, when the four images of chapter 02
+are missing). CI runs the script, then `latexmk`. The book's chapters 01-04 are the four notes
+(optimisation, FPO, proposal, walkthrough), chapter 05 the D1 note, chapter 06 the approved
+decisions; the walkthrough describes the code at an older commit, these pages the current code.
 
 **Deployment.** `.github/workflows/docs.yml` runs on every push to `twin` and `main`: it builds the
 book PDF, runs `tests/test_docs.py` and `mkdocs build --strict`, copies `book.pdf` into the site and

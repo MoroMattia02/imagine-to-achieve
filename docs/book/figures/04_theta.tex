@@ -1,0 +1,12 @@
+% The figure "twin:fig:theta" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[cell/.style={draw,minimum width=24mm,minimum height=8mm,font=\scriptsize,fill=orange!8},>={Stealth[length=2mm]}]
+\foreach \r/\lab in {0/{\psi_1},1/{\psi_2},2/{\psi_K}}{
+  \node[draw,fill=blue!8,font=\scriptsize,minimum width=22mm,minimum height=8mm,align=center] at (-1.4,-\r*1.0) {\texttt{MjModel} $\lab$};
+  \foreach \c/\cl in {0/{x_1},1/{x_2},2/{x_M}}{
+    \node[cell] at (1.9+\c*2.6,-\r*1.0) {\texttt{MjData} $(\lab,\cl)$};
+  }
+}
+\node[font=\scriptsize,align=center] at (4.5,0.75) {start scenes $x_0\in\hat\X_\nu$ (from the cache, moment B)};
+\node[font=\scriptsize,align=left,text width=36mm] at (11.0,-1.0) {all $K\cdot M$ rollouts receive the \textbf{same} joint targets from the \textbf{same} actions; the verdicts ask whether something holds for \emph{all} of them};
+\end{tikzpicture}%

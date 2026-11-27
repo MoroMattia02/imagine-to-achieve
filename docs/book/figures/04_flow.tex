@@ -1,0 +1,36 @@
+% The figure "twin:fig:flow" of import/twin_walkthrough.tex, moved here unchanged in D.2;
+% \input by chapters/04_twin.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[scale=0.86,transform shape,>={Stealth[length=2mm]},
+  st/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,minimum height=10mm,text width=28mm,inner sep=2pt},
+  file/.style={draw,align=center,font=\scriptsize,fill=yellow!14,text width=28mm,inner sep=2pt,minimum height=10mm}]
+% headers
+\node[font=\small\bfseries,text=navy] at (3.3,1.3) {before training (moments A--C)};
+\node[font=\small\bfseries,text=okgreen] at (12.0,1.3) {every chunk $k$, every candidate $i$ (moment D)};
+\draw[gray,dashed] (8.4,1.0) -- (8.4,-6.6);
+% offline
+\node[st,fill=navy!6] (ds) at (0,0) {LeRobot dataset\\ 40 episodes};
+\node[st,fill=blue!8] (ini) at (3.4,0) {initialiser (Step 2)\\ once per episode};
+\node[file] (cache) at (6.6,0) {\texttt{scene\_cache/}\\ $\hat\X_\nu$, $q_0$ per episode};
+\node[st,fill=navy!6] (lab) at (0,-1.6) {lab measurements,\\ camera parameters};
+\node[st,fill=blue!8] (gen) at (3.4,-1.6) {general twin (Step 1)\\ MJCF $\to$ \texttt{MjModel}};
+\node[st,fill=orange!10] (cal) at (3.4,-3.2) {calibration (Step 5)\\ demo replays through T2};
+\node[file] (calf) at (6.6,-3.2) {$p(\psi)$, $T_{WB}$, lag,\\ phase map, thresholds};
+\draw[->] (ds) -- (ini); \draw[->] (ini) -- (cache);
+\draw[->] (lab) -- (gen); \draw[->] (gen) -- (ini); \draw[->] (gen) -- (cal);
+\draw[->] (ds.west) -- ++(-0.25,0) |- (cal.west);
+\draw[->] (cal) -- (calf);
+% online
+\node[st,fill=orange!12] (pol) at (10.2,0) {policy chunk\\ $a_{i,k}$: $(32,10)$};
+\node[st,fill=blue!8] (cw) at (13.8,0) {Ctrl-World\\ video $\VW_{i,k}$};
+\node[st,fill=blue!8] (t2) at (10.2,-1.6) {T2: EEF targets + IK\\ $q$: $(64,6)$, once};
+\node[st,fill=orange!8] (sim) at (10.2,-3.2) {physics + render\\ for each $\vartheta\in\Theta$\\ $\VS_{i,k}(\vartheta)$};
+\node[st,fill=red!7] (feat) at (13.8,-3.2) {V-JEPA 2 features,\\ change since frame 0};
+\node[st,fill=red!7] (ver) at (13.8,-4.8) {chunk 0: verdicts $p_{i,0}$\\ all $k$: divergence $g_{i,k}$};
+\node[st,fill=green!8] (w) at (13.8,-6.2) {$w_{i,k}=p_{i,k}g_{i,k}$\\ $\to$ trust-weighted $\hat r$};
+\draw[->] (pol) -- (cw); \draw[->] (pol) -- (t2); \draw[->] (t2) -- (sim);
+\draw[->] (cw) -- (feat); \draw[->] (sim) -- (feat); \draw[->] (feat) -- (ver); \draw[->] (ver) -- (w);
+% artefacts into the loop
+\draw[->,thick,dashed,okgreen] (cache.east) -- (8.6,0) |- ([yshift=2mm]sim.west);
+\draw[->,thick,dashed,okgreen] (calf.east) -- ([yshift=-2mm]sim.west);
+\draw[->,thick,dashed,okgreen] (calf.south) |- (ver.west);
+\end{tikzpicture}%

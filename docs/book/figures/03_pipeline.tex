@@ -1,0 +1,26 @@
+% The figure "method:fig:pipeline" of import/thesis_proposal_final.tex, moved here unchanged in D.2;
+% \input by chapters/03_method.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[scale=0.94,transform shape,
+  box/.style={draw,rounded corners=2pt,align=center,font=\footnotesize,minimum height=10mm,inner sep=3pt,text width=#1},
+  box/.default=24mm,
+  >={Stealth[length=2mm]}]
+\node[box=22mm,fill=navy!8] (o0) at (0,0) {real first frame $o_0$\\ (3 cameras)};
+\node[box=25mm,fill=orange!12] (pol) at (3.4,0) {\textbf{Policy} (Cosmos)\\ plan $\VC$, actions $a$};
+\node[box=26mm,fill=blue!8] (wm) at (7.3,1.2) {\textbf{Ctrl-World}\\ predicted video $\VW$};
+\node[box=26mm,fill=orange!8] (tw) at (7.3,-1.2) {\textbf{Physics twin}\\ rendered video $\VS$};
+\node[box=24mm,fill=yellow!14] (rew) at (11.1,1.2) {\textbf{reward} $r$\\ $\VC$ vs $\VW$};
+\node[box=24mm,fill=red!7] (cmp) at (11.1,-1.2) {\textbf{compare}\\ change since frame 0\\ $\Rightarrow$ verdict};
+\node[box=24mm,fill=green!8] (tr) at (14.6,0) {\textbf{trust-weighted}\\ reward $\hat r$ $\to$ FPO};
+\node[box=22mm,fill=navy!5] (ini) at (3.4,-2.6) {\textbf{initialiser}\\ SAM\,3 + fit};
+\draw[->] (o0) -- (pol);
+\draw[->] (pol.east) -- ++(3mm,0) |- (wm.west) node[pos=0.8,above,font=\scriptsize]{$a$};
+\draw[->] (pol.east) -- ++(3mm,0) |- (tw.west) node[pos=0.8,above,font=\scriptsize]{same $a$};
+\draw[->] (o0.south) |- (ini.west);
+\draw[->] (ini.east) -| ([xshift=-6mm]tw.south);
+\draw[->] (wm) -- (rew);
+\draw[->] (wm.south east) -- (cmp.north west);
+\draw[->] (tw) -- (cmp);
+\draw[->] (rew.east) -- ++(2mm,0) |- ([yshift=2mm]tr.west);
+\draw[->] (cmp.east) -- ++(2mm,0) |- ([yshift=-2mm]tr.west) node[pos=0.25,right,font=\scriptsize]{$w$};
+\draw[->,dashed] (wm.north) -- ++(0,6mm) -| node[pos=0.25,above,font=\scriptsize]{next observation $o_{k+1}=\mathrm{Ext}(\VW_k)$ (paper's loop)} (pol.north);
+\end{tikzpicture}%

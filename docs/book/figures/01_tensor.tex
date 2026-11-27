@@ -1,0 +1,27 @@
+% The figure "loop:fig:tensor" of import/awyi_optimisation.tex, moved here unchanged in D.2;
+% \input by chapters/01_paper_loop.tex. The final % keeps the spacing of the original.
+\begin{tikzpicture}[x=0.78cm,y=0.5cm,>={Stealth[length=2mm]}]
+  \foreach \b/\yo/\lab in {0/0/{b=1},1/-6.2/{b=2},2/-12.4/{b=B}}{
+    \foreach \i in {0,...,4}{
+      \foreach \k in {0,...,4}{
+        \pgfmathsetmacro{\yy}{\yo-\i}
+        \draw[gray!60,fill=white] (\k,\yy) rectangle ++(1,-0.9);
+      }
+    }
+    \node[anchor=east,font=\small,align=right] at (-0.35,\yo-2.4) {$\lab$\\[-1pt]{\scriptsize members}\\[-2pt]{\scriptsize $i=1,\dots,G$}};
+    \draw[decorate,decoration={brace,amplitude=4pt,mirror}] (-0.1,\yo) -- (-0.1,\yo-4.9);
+  }
+  \node at (2.5,-11.4) {$\vdots$};
+  \draw[very thick,blue!70!black,fill=blue!12] (2,0) rectangle (3,-4.9);
+  \foreach \i in {0,...,4}{ \draw[gray!60] (2,-\i) rectangle ++(1,-0.9); }
+  \draw[very thick,red!70!black] (0,-1) rectangle (5,-1.9);
+  \foreach \k in {0,...,4}{ \node[font=\scriptsize] at (\k+0.5,0.6) {$k{=}\k$}; }
+  \node[align=left,font=\small,anchor=north west,text width=6.4cm] (rowlab) at (6.6,1.2)
+    {\textcolor{red!70!black}{\textbf{Row} $(b,i,\cdot)$: one rollout.} Rewards $r_{b,i,k}$ are computed chunk by chunk and summed backwards into the suffix return $R_{b,i,k}$, Eq.~\eqp{11}.};
+  \node[align=left,font=\small,anchor=north west,text width=6.4cm] (collab) at (6.6,-4.4)
+    {\textcolor{blue!70!black}{\textbf{Column inside a block} $(b,\cdot,k)$: the comparison set $\mathcal S_{b,k}$.} Mean and std are taken over these $G$ cells only, Eq.~\eqp{12}. Cells in other blocks or other columns never enter.};
+  \draw[->,red!70!black] (6.55,-1.45) -- (5.05,-1.45);
+  \draw[->,blue!70!black] (6.55,-5.6) -- (3.05,-3.8);
+  \node[align=left,font=\small,anchor=north west,text width=6.4cm] at (6.6,-11.0)
+    {After normalisation all $BGN$ cells are flattened into one list of chunk samples $(z,c,\Omega,\hat L^{a}_{\mathrm{old}},\hat A)$, split into minibatches and used by the FPO update, Eq.~\eqp{16}. From then on the indices only label samples.};
+\end{tikzpicture}%

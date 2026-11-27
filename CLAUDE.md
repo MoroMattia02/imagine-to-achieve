@@ -49,7 +49,9 @@ Data-free roadmap and the current WP: `docs/thesis/data_free_roadmap.md`.
 - Heavy dependencies (ray, real-run extras, SAM 3, V-JEPA) are not needed for milestones T0 to T3 and T8.
 - Docs (`pip install -e ".[docs]"`): `python scripts/make_code_deps.py` after changing an import;
   `python -m pytest tests/test_docs.py -q`; `mkdocs build --strict`. Book: `make -C docs/book`
-  (needs latexmk; figures first with `python scripts/make_book_figures.py docs/book/figures`).
+  (needs latexmk and matplotlib; it regenerates the chapter 02 images with
+  `scripts/make_book_figures.py` when missing). On the lab PC, TeX is TinyTeX, not on PATH:
+  `export PATH=/data/moro/tinytex/.TinyTeX/bin/x86_64-linux:$PATH`.
 
 ## Definition of done (every WP)
 A WP is finished only when: (1) docstrings of changed public functions are updated; (2) the
